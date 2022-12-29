@@ -1,0 +1,4 @@
+TODO
+
+1. Crear una funcion que dado un string genere el terreno
+2. Retornar un diccionario con las observaciones nada mas

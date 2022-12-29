@@ -1,0 +1,271 @@
+seed: 1
+record_video: yes
+
+environment:
+    render: True
+    render_command: True
+    render_height_scan: False
+# just testing commenting
+    num_envs: 100
+    eval_every_n: 200
+    num_threads: 8 # Previously 30
+    simulation_dt: 0.0025  # If latency control enabled [line 16], this is the maximum dt else is the fixed dt
+    control_dt: 0.01       # Default value is 0.01 s. Equals to 100 Hz
+    max_time: 5.0
+    external_force_max_value     : 10.0  # [Newton]
+    external_force_time_threshold : 3.0     # [s]
+    latency_control:
+        enabled: False # The latency is in Hz and modifies the control_dt 
+        min:  95.0
+        peak: 100.0
+        max:  105.0
+    reward:
+        linearVel:
+            coeff: 0.1
+        angularVel:
+            coeff: 0.05
+        torque:
+            coeff: -2e-5
+        baseMotion: # This is a legacy reward, not used anymore
+            coeff: 0
+        linearOrthogonalVelocity:
+            coeff: 0.05
+        bodyMotion:
+            coeff: 0.07
+        bodyCollision:
+            coeff: 0.02
+        footClearance:
+            coeff: 0.06
+        targetSmoothness:
+            coeff: 0.025
+        jointMotion:
+            coeff: 1e-8
+        slip:
+            coeff: 0.006
+    reward_control:
+        velocity_threshold: 0.6 # m/s
+        reward_curriculum_coeff: 0.01
+        reward_curriculum_coeff_decay: 0.98
+    pd_gains: 
+        # PD control gains: For a constant value, set max and min to the same value
+        # Each reset of the environment, the gains are randomly sampled between min and max using a 
+        # uniform distribution. The default gains are Kp = 60. and Kd = 2.2
+        kp_max: 60.0
+        kp_min: 60.0
+        kd_max: 2.2
+        kd_min: 2.2
+    robot:
+        H_OFF            : 0.063
+        V_OFF            : 0.008
+        THIGH_LEN        : 0.11058
+        SHANK_LEN        : 0.1265
+        LEG_SPAN         : 0.2442
+    gait:
+        base_frequency : 12   # Hz
+        leg_1_phase    : 0.0   # [rad]
+        leg_2_phase    : 3.142 # [rad]
+        leg_3_phase    : 3.142 # [rad]
+        leg_4_phase    : 0.0   # [rad]
+        max_foot_height: 0.2   # m
+        cartesian_movement_heuristic: True
+        angular_movement_heuristic:   True
+    height_scan:
+        foot_scan_radius : 0.06
+        scans_per_ring   : 13
+        n_scan_rings     : 4
+    action_params:
+        action_mean:
+            x_residual: 0.0
+            y_residual: 0.0
+            z_residual: 0.0
+            frequency: 0.0
+        action_scale:
+            x_residual: 0.015 # [m] (Valor usual 0.015)
+            y_residual: 0.015 # [m]
+            z_residual: 0.03 # [m]  (Valor usual 0.03)
+            frequency: 0.0125 # [Hz]
+    control:
+        directed_gait  : False # Overrrides the gait parameters below
+        move_straight_command_prob  : 0.1
+        move_straight_facing_random_direction_command_prob : 0.7
+        fixed_direction_command_prob: 0.1
+        stance_command_prob         : 0.1
+        command_duration            : 3.0 # [s]
+    orientation_noise_std: 0.09 # [rad]  This parameter must be set so the orientation noise also affects the gait generation If this is set, then no extra noise should be applied to the  gravity vector
+    state_variables:
+        desired_direction     : 
+            name : 'desired_direction'
+            priviledge : False
+            noise_std : 0.0
+            enabled: True
+            position: 1
+            encoder_obs : True
+        desired_turning_direction :
+            name : 'desired_turning_direction'
+            priviledge : False
+            noise_std : 0.0
+            enabled: True
+            position: 2
+            encoder_obs : True
+        body_height:
+            name : 'body_height'
+            priviledge : False
+            noise_std : 0
+            enabled: False
+            position: 3
+            encoder_obs : False
+        gravity_vector        : 
+            name : 'gravity_vector' 
+            priviledge : False
+            noise_std : 0 # Noise should not be added to this state variable in this parameter
+            enabled: True
+            position: 4
+            encoder_obs : True
+        base_angular_velocity :
+            name : 'base_angular_velocity'
+            priviledge : False
+            noise_std : 0.2
+            enabled: True 
+            position: 5
+            encoder_obs : True
+        base_linear_velocity  : 
+            name : 'base_linear_velocity'
+            priviledge : False
+            noise_std : 0.07
+            enabled: True
+            position: 6
+            encoder_obs : True
+        joint_position        : 
+            name : 'joint_position'
+            priviledge : False
+            noise_std : 0.314
+            enabled: True
+            position: 7
+            encoder_obs : True
+        joint_velocity        : 
+            name : 'joint_velocity'
+            priviledge : False
+            noise_std : 0.0314
+            enabled: True
+            position: 8
+            encoder_obs : True
+        FTG_sin_phases        : 
+            name : 'FTG_sin_phases'
+            priviledge : False
+            noise_std : 0.0
+            enabled: True
+            position: 9
+            encoder_obs : True
+        FTG_cos_phases        : 
+            name : 'FTG_cos_phases'
+            priviledge : False
+            noise_std : 0.0
+            enabled: True
+            position: 10
+            encoder_obs : True
+        FTG_frequencies       :
+            name : 'FTG_frequencies'
+            priviledge : False
+            noise_std : 0.0
+            enabled: True 
+            position: 11
+            encoder_obs : True
+        base_frequency        : 
+            name : 'base_frequency'
+            priviledge : False
+            noise_std : 0.0
+            enabled: True
+            position: 12
+            encoder_obs : False
+        joint_pos_err_hist    :
+            name : 'joint_pos_err_hist'
+            priviledge : False
+            noise_std : 0
+            enabled: True 
+            position: 13
+            encoder_obs : False
+        joint_vel_hist    :
+            name : 'joint_vel_hist'
+            priviledge : False
+            noise_std : 0
+            enabled: True
+            position: 14
+            encoder_obs : False
+        feet_target_hist      :
+            name : 'feet_target_hist'
+            priviledge : False
+            noise_std : 0.0
+            enabled: True
+            position: 15
+            encoder_obs : False
+        terrain_normal_at_each_foot:
+            name : 'terrain_normal_at_each_foot'
+            priviledge : True
+            noise_std : 0.0
+            enabled: True
+            position: 16
+            encoder_obs : False
+        feet_height_scan:
+            name : 'feet_height_scan'
+            priviledge : True
+            noise_std : 0.0
+            enabled: True
+            position: 17
+            encoder_obs : False
+        foot_contact_forces:
+            name : 'foot_contact_forces'
+            priviledge : True
+            noise_std : 0.0
+            enabled: True
+            position: 18
+            encoder_obs : False
+        foot_contact_states:
+            name : 'foot_contact_states'
+            priviledge : True
+            noise_std : 0.0
+            enabled: True
+            position: 19
+            encoder_obs : False
+        shank_contact_states:
+            name : 'shank_contact_states'
+            priviledge : True
+            noise_std : 0.0
+            enabled: True
+            position: 20
+            encoder_obs : False
+        thigh_contact_states:
+            name : 'thigh_contact_states'
+            priviledge : True
+            noise_std : 0.0
+            enabled: True
+            position: 21
+            encoder_obs : False
+        foot_ground_fricction_coeff:
+            name : 'foot_ground_fricction_coeff'
+            priviledge : True
+            noise_std : 0.0
+            enabled: True
+            position: 22
+            encoder_obs : False
+        external_force_applied_to_base:
+            name : 'external_force_applied_to_base'
+            priviledge : True
+            noise_std : 0.0
+            enabled: True
+            position: 23
+            encoder_obs : False
+        pd_constants:
+            name : 'pd_constants'
+            priviledge : True
+            noise_std : 0.0
+            enabled: False
+            position: 24
+            encoder_obs : False
+
+
+
+architecture:
+    policy_net: [256, 128, 64]
+    value_net: [256, 128, 64]
+
+
