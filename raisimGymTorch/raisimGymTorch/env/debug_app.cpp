@@ -10,19 +10,24 @@ int THREAD_COUNT = 1;
 
 using namespace raisim;
 
-int main(int argc, char *argv[]) {
-  RSFATAL_IF(argc != 3, "got "<<argc<<" arguments. "<<"This executable takes three arguments: 1. resource directory, 2. configuration file")
+int main(int argc, char *argv[])
+{
+  RSFATAL_IF(argc != 3, "got " << argc << " arguments. "
+                               << "This executable takes three arguments: 1. resource directory, 2. configuration file")
 
   std::string resourceDir(argv[1]), cfgFile(argv[2]);
-  std::ifstream myfile (cfgFile);
+  std::ifstream myfile(cfgFile);
   std::string config_str, line;
   bool escape = false;
 
-  while (std::getline(myfile, line)) {
-    if(line == "environment:") {
+  while (std::getline(myfile, line))
+  {
+    if (line == "environment:")
+    {
       escape = true;
-      while (std::getline(myfile, line)) {
-        if(line.substr(0, 2) == "  ")
+      while (std::getline(myfile, line))
+      {
+        if (line.substr(0, 2) == "  ")
           config_str += line.substr(2) + "\n";
         else if (line[0] == '#')
           continue;
@@ -30,7 +35,7 @@ int main(int argc, char *argv[]) {
           break;
       }
     }
-    if(escape)
+    if (escape)
       break;
   }
   config_str.pop_back();

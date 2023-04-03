@@ -3,257 +3,432 @@
 // Copyright 2020, RaiSim Tech//
 //----------------------------//
 
-#ifndef SRC_RAISIMGYMVECENV_HPP
-#define SRC_RAISIMGYMVECENV_HPP
+#pragma once
 
-#include "RaisimGymEnv.hpp"
 #include "omp.h"
 #include "Yaml.hpp"
+#include "RaisimGymEnv.hpp"
 
-namespace raisim {
+namespace raisim
+{
     int THREAD_COUNT;
 
-    template<class ChildEnvironment>
-    class VectorizedEnvironment {
-
-    public:
-
-    explicit VectorizedEnvironment(std::string resourceDir, std::string cfg, bool normalizeObservation=true)
-        : resourceDir_(resourceDir), cfgString_(cfg), normalizeObservation_(normalizeObservation) {
-        Yaml::Parse(cfg_, cfg);
-
-        if(&cfg_["render"])
-        render_ = cfg_["render"].template As<bool>();
-        init();
-    }
-
-    ~VectorizedEnvironment() {
-        for (auto *ptr: environments_)
-        delete ptr;
-    }
-
-    const std::string& getResourceDir() const { return resourceDir_; }
-    const std::string& getCfgString() const { return cfgString_; }
-
-    void init() {
-        THREAD_COUNT = cfg_["num_threads"].template As<int>();
-        omp_set_num_threads(THREAD_COUNT);
-        num_envs_ = cfg_["num_envs"].template As<int>();
-
-        environments_.reserve(num_envs_);
-        rewardInformation_.reserve(num_envs_);
-        for (int i = 0; i < num_envs_; i++) {
-        environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && i == 0));
-        environments_.back()->setSimulationTimeStep(cfg_["simulation_dt"].template As<double>());
-        environments_.back()->setControlTimeStep(cfg_["control_dt"].template As<double>());
-        rewardInformation_.push_back(environments_.back()->getRewards().getStdMap());
-        }
-
-        for (int i = 0; i < num_envs_; i++) {
-        // only the first environment is visualized
-        environments_[i]->init();
-        environments_[i]->reset();
-        }
-
-        obDim_ = environments_[0]->getObDim();
-        actionDim_ = environments_[0]->getActionDim();
-        RSFATAL_IF(obDim_ == 0 || actionDim_ == 0, "Observation/Action dimension must be defined in the constructor of each environment!")
-
-        /// ob scaling
-        if (normalizeObservation_) {
-        obMean_.setZero(obDim_);
-        obVar_.setOnes(obDim_);
-        recentMean_.setZero(obDim_);
-        recentVar_.setZero(obDim_);
-        delta_.setZero(obDim_);
-        epsilon.setZero(obDim_);
-        epsilon.setConstant(1e-8);
-        }
-    }
-
-    // resets all environments and returns observation
-    void reset() {
-        for (auto env: environments_)
-        env->reset();
-    }
-
-    void observe(Eigen::Ref<EigenRowMajorMat> &ob, bool updateStatistics) {
-    #pragma omp parallel for schedule(auto)
-        for (int i = 0; i < num_envs_; i++)
-        environments_[i]->observe(ob.row(i));
-
-        if (normalizeObservation_)
-        updateObservationStatisticsAndNormalize(ob, updateStatistics);
-    }
-
-
-    void step(Eigen::Ref<EigenRowMajorMat> &action,
-                Eigen::Ref<EigenVec> &reward,
-                Eigen::Ref<EigenBoolVec> &done) {
-    #pragma omp parallel for schedule(auto)
-        for (int i = 0; i < num_envs_; i++)
-        perAgentStep(i, action, reward, done);
-    }
-
-    void turnOnVisualization() { if(render_) environments_[0]->turnOnVisualization(); }
-    void turnOffVisualization() { if(render_) environments_[0]->turnOffVisualization(); }
-    void startRecordingVideo(const std::string& videoName) { if(render_) environments_[0]->startRecordingVideo(videoName); }
-    void stopRecordingVideo() { if(render_) environments_[0]->stopRecordingVideo(); }
-    void getObStatistics(Eigen::Ref<EigenVec> &mean, Eigen::Ref<EigenVec> &var, float &count) {
-        mean = obMean_; var = obVar_; count = obCount_; }
-    void setObStatistics(Eigen::Ref<EigenVec> &mean, Eigen::Ref<EigenVec> &var, float count) {
-        obMean_ = mean; obVar_ = var; obCount_ = count; }
-
-    void setSeed(int seed) {
-        int seed_inc = seed;
-
-        #pragma omp parallel for schedule(auto)
-        for(int i=0; i<num_envs_; i++)
-        environments_[i]->setSeed(seed_inc++);
-    }
-
-    void close() {
-        for (auto *env: environments_)
-        env->close();
-    }
-
-    void isTerminalState(Eigen::Ref<EigenBoolVec>& terminalState) {
-        for (int i = 0; i < num_envs_; i++) {
-        float terminalReward;
-        terminalState[i] = environments_[i]->isTerminalState(terminalReward);
-        }
-    }
-
-    void setSimulationTimeStep(double dt) {
-        for (auto *env: environments_)
-        env->setSimulationTimeStep(dt);
-    }
-
-    void setControlTimeStep(double dt) {
-        for (auto *env: environments_)
-        env->setControlTimeStep(dt);
-    }
-
-    int getObDim() { return obDim_; }
-    int getActionDim() { return actionDim_; }
-    int getNumOfEnvs() { return num_envs_; }
-
-    ////// optional methods //////
-    void curriculumUpdate() {
-        for (auto *env: environments_)
-        env->curriculumUpdate();
+    /**
+     * @brief Class that stores the parameters to normalize the observations
+     *
+     */
+    struct statistics_t
+    {
+        // Mean of each observation
+        std::map<std::string, Eigen::VectorXd> mean;
+        // Variance of each observation
+        std::map<std::string, Eigen::VectorXd> var;
+        // Total samples performed
+        float count;
     };
 
-    const std::vector<std::map<std::string, float>>& getRewardInfo() { return rewardInformation_; }
+    template <class ChildEnvironment>
+    class VectorizedEnvironment
+    {
 
     private:
-    void updateObservationStatisticsAndNormalize(Eigen::Ref<EigenRowMajorMat> &ob, bool updateStatistics) {
-        if (updateStatistics) {
-        recentMean_ = ob.colwise().mean();
-        recentVar_ = (ob.rowwise() - recentMean_.transpose()).colwise().squaredNorm() / num_envs_;
+        // Individual environments
+        std::vector<ChildEnvironment *> environments_;
 
-        delta_ = obMean_ - recentMean_;
-        for(int i=0; i<obDim_; i++)
-            delta_[i] = delta_[i]*delta_[i];
+        // Port through which you can connect to the simulation visualizer.
+        int port_;
+        // Current epoch
+        int epoch_ = 0;
+        // Environments configuration
+        Yaml::Node cfg_;
+        // Number of environments in parallel
+        int num_envs_ = 1;
+        // Action space dimension
+        int action_dim = 0;
+        // Indicates if a simulation will be displayed visually
+        bool render_ = false;
+        // String that contains the environment configuration
+        std::string cfg_string_;
+        // Directory where the resources needed to build the environment
+        // are located
+        std::string resource_dir_;
+        // Dimension of the space of each observation
+        std::map<std::string, int> observation_dimensions_;
 
-        float totCount = obCount_ + num_envs_;
+        /// Indicates whether the observations should be normalized
+        bool normalize_ = true;
+        // Mean of each observation
+        std::map<std::string, Eigen::VectorXd> mean_;
+        // Variance of each observation
+        std::map<std::string, Eigen::VectorXd> var_;
+        // Total samples performed
+        float count_ = 1e-4;
 
-        obMean_ = obMean_ * (obCount_ / totCount) + recentMean_ * (num_envs_ / totCount);
-        obVar_ = (obVar_ * obCount_ + recentVar_ * num_envs_ + delta_ * (obCount_ * num_envs_ / totCount)) / (totCount);
-        obCount_ = totCount;
+        void update_statistics(Eigen::Ref<EigenMapVec> &observations, bool update)
+        {
+            // Variables used to calculate the mean and variance of
+            // each observation
+            std::map<std::string, Eigen::VectorXd> recent_mean, recent_var, delta;
+
+            if (update)
+            {
+                // Calculate the mean and variance per position for each
+                // key in each map
+                std::map<std::string, Eigen::VectorXd> sum_squares;
+
+                for (int i = 0; i < this->num_envs_; i++)
+                {
+                    for (const auto &pair : observations(i, 0))
+                    {
+                        const std::string &key = pair.first;
+                        const Eigen::VectorXd &vec = pair.second;
+                        if (recent_mean.count(key) == 0)
+                        {
+                            recent_mean[key] = vec;
+                            sum_squares[key] = vec.array().square().matrix();
+                        }
+                        else
+                        {
+                            recent_mean[key] += vec;
+                            sum_squares[key] += vec.array().square().matrix();
+                        }
+                    }
+                }
+                for (auto &pair : recent_mean)
+                {
+                    pair.second /= observations.rows();
+                }
+                for (auto &pair : sum_squares)
+                {
+                    pair.second /= observations.rows();
+                }
+
+                recent_var.clear();
+                for (const auto &pair : recent_mean)
+                {
+                    const std::string &key = pair.first;
+                    const Eigen::VectorXd &mean = pair.second;
+                    recent_var[key] = sum_squares[key] - mean.array().square().matrix();
+                }
+
+                // Calculate the delta
+                for (const auto &pair : this->mean_)
+                {
+                    const std::string &key = pair.first;
+                    const Eigen::VectorXd &mean = pair.second;
+                    const Eigen::VectorXd &current_recent_mean = recent_mean[key];
+                    delta[key] = (mean - current_recent_mean).array().square().matrix();
+                }
+
+                // Update the cumulative mean and variance
+                float total_count = this->count_ + this->num_envs_;
+                for (auto &pair : this->mean_)
+                {
+                    const std::string &key = pair.first;
+                    Eigen::VectorXd &mean = pair.second;
+                    const Eigen::VectorXd &current_recent_mean = recent_mean[key];
+                    mean = mean * (this->count_ / total_count) +
+                           current_recent_mean * (this->num_envs_ / total_count);
+                }
+                for (auto &pair : this->var_)
+                {
+                    const std::string &key = pair.first;
+                    Eigen::VectorXd &var = pair.second;
+                    const Eigen::VectorXd &current_recent_var = recent_var[key];
+                    const Eigen::VectorXd &current_delta = delta[key];
+                    var = (var * this->count_ +
+                           current_recent_var * this->num_envs_ +
+                           current_delta * (this->count_ * this->num_envs_ / total_count)) /
+                          total_count;
+                }
+                this->count_ = total_count;
+            }
+
+#pragma omp parallel for schedule(auto)
+            // Normalize each vector in each map
+            for (int i = 0; i < this->num_envs_; i++)
+            {
+                std::map<std::string, Eigen::VectorXd> &map = observations(i, 0);
+                for (auto &pair : map)
+                {
+                    const std::string &key = pair.first;
+                    Eigen::VectorXd &vec = pair.second;
+                    const Eigen::VectorXd &mean = mean_[key];
+                    const Eigen::VectorXd &var = var_[key];
+                    Eigen::VectorXd epsilon = Eigen::VectorXd::Constant(vec.size(), 1e-8);
+                    vec = (vec.array() - mean.array()) / (var.array() + epsilon.array()).sqrt();
+                }
+            }
         }
 
-    #pragma omp parallel for schedule(auto)
-        for(int i=0; i<num_envs_; i++)
-        ob.row(i) = (ob.row(i) - obMean_.transpose()).template cwiseQuotient<>((obVar_ + epsilon).cwiseSqrt().transpose());
-    }
+    public:
+        explicit VectorizedEnvironment(
+            std::string resource_dir,
+            std::string cfg,
+            int port,
+            bool normalize = true) : resource_dir_(resource_dir),
+                                     cfg_string_(cfg),
+                                     normalize_(normalize),
+                                     port_(port)
+        {
+            Yaml::Parse(cfg_, cfg);
 
-    inline void perAgentStep(int agentId,
-                            Eigen::Ref<EigenRowMajorMat> &action,
-                            Eigen::Ref<EigenVec> &reward,
-                            Eigen::Ref<EigenBoolVec> &done) {
-        reward[agentId] = environments_[agentId]->step(action.row(agentId));
-        rewardInformation_[agentId] = environments_[agentId]->getRewards().getStdMap();
-
-        float terminalReward = 0;
-        done[agentId] = environments_[agentId]->isTerminalState(terminalReward);
-
-        if (done[agentId]) {
-        environments_[agentId]->reset();
-        reward[agentId] += terminalReward;
+            if (&cfg_["render"])
+                this->render_ = cfg_["render"].template As<bool>();
+            init();
         }
-    }
 
-    std::vector<ChildEnvironment *> environments_;
-    std::vector<std::map<std::string, float>> rewardInformation_;
+        ~VectorizedEnvironment()
+        {
+            for (auto *ptr : this->environments_)
+                delete ptr;
+        }
 
-    int num_envs_ = 1;
-    int obDim_ = 0, actionDim_ = 0;
-    bool recordVideo_=false, render_=false;
-    std::string resourceDir_;
-    Yaml::Node cfg_;
-    std::string cfgString_;
+        /**
+         * @brief Initialize all environments with the indicated configuration
+         *
+         */
+        void init(void)
+        {
+            THREAD_COUNT = cfg_["num_threads"].template As<int>();
+            omp_set_num_threads(THREAD_COUNT);
+            this->num_envs_ = cfg_["num_envs"].template As<int>();
 
-    /// observation running mean
-    bool normalizeObservation_ = true;
-    EigenVec obMean_;
-    EigenVec obVar_;
-    float obCount_ = 1e-4;
-    EigenVec recentMean_, recentVar_, delta_;
-    EigenVec epsilon;
+            this->environments_.reserve(this->num_envs_);
+            for (int i = 0; i < this->num_envs_; i++)
+            {
+                this->environments_.push_back(new ChildEnvironment(
+                    this->resource_dir_,
+                    this->cfg_,
+                    this->render_ && i == 0,
+                    this->port_));
+            }
+
+            for (int i = 0; i < this->num_envs_; i++)
+            {
+                // Only the first environment is visualized
+                this->environments_[i]->reset(0);
+            }
+
+            this->observation_dimensions_ = this->environments_[0]->get_observations_dimension();
+            this->action_dim = this->environments_[0]->get_action_dimension();
+
+            if (this->normalize_)
+            {
+                for (const auto &[key, value] : this->observation_dimensions_)
+                {
+                    this->mean_[key] = Eigen::VectorXd::Zero(value);
+                    this->var_[key] = Eigen::VectorXd::Zero(value);
+                }
+            }
+        }
+
+        /**
+         * @brief Restart all environments
+         *
+         * @param epoch Current train epoch
+         */
+        void reset(int epoch)
+        {
+            this->epoch_ = epoch;
+            for (auto env : this->environments_)
+                env->reset(epoch);
+        }
+
+        /**
+         * @brief Perform one step in each simulation
+         *
+         * @param actions Action taken in each environment
+         * @return std::vector<step_t>  Information returned in each environment
+         */
+        std::vector<step_t> step(Eigen::Ref<EigenRowMajorMat> &actions)
+        {
+            std::vector<step_t> result(this->num_envs_);
+
+#pragma omp parallel for schedule(auto)
+            for (int i = 0; i < this->num_envs_; i++)
+            {
+                step_t step_info = this->environments_[i]->step(actions.row(i));
+                result[i] = step_info;
+                if (step_info.done)
+                {
+                    this->environments_[i]->reset(this->epoch_);
+                }
+            }
+            return result;
+        }
+
+        /**
+         * @brief Obtains the statistics of the observations
+         *
+         * @return statistics_t Observation statistics data
+         */
+        statistics_t get_statistics(void)
+        {
+            return {this->mean_, this->var_, this->count_};
+        }
+
+        const std::string &get_resource_dir() const
+        {
+            return this->resource_dir_;
+        }
+
+        const std::string &get_cfg_string() const
+        {
+            return this->cfg_string_;
+        }
+
+        /**
+         * @brief Set the statistics of the observations
+         *
+         * @param stats_data Observation statistics data
+         */
+        void set_statistics(statistics_t stats_data)
+        {
+            this->mean_ = stats_data.mean;
+            this->var_ = stats_data.var;
+            this->count_ = stats_data.count;
+        }
+
+        /**
+         * @brief Create the training terrain that contains hills.
+         *
+         * @param frequency How often each hill appears.
+         *      Recommended range: [0.00, 0.35]
+         * @param amplitude Height of the hills.
+         *      Recommended range: [0.00, 2.00]
+         * @param roughness Terrain roughness.
+         *      Recommended range: [0.00, 0.06]
+         */
+        void hills(double frequencies, double amplitudes, double roughness)
+        {
+#pragma omp parallel for schedule(auto)
+            for (int i = 0; i < num_envs_; i++)
+                environments_[i]->hills(frequencies, amplitudes, roughness);
+        }
+
+        /**
+         * @brief Create the training terrain that contains stairs.
+         *
+         * @param width Width of each step.
+         * @param height Height of each step.
+         */
+        void stairs(double widths, double heights)
+        {
+#pragma omp parallel for schedule(auto)
+            for (int i = 0; i < num_envs_; i++)
+                environments_[i]->stairs(widths, heights);
+        }
+
+        /**
+         * @brief Create the training terrain that contains stepped terrain
+         *
+         * @param frequency Frequency of the cellular noise
+         * @param amplitude Scale to multiply the cellular noise
+         */
+        void cellular_steps(double frequencies, double amplitudes)
+        {
+#pragma omp parallel for schedule(auto)
+            for (int i = 0; i < num_envs_; i++)
+                environments_[i]->cellular_steps(frequencies, amplitudes);
+        }
+
+        /**
+         * @brief Generates a terrain made of steps (little square boxes)
+         *
+         * @param width  Width of each of the steps [m]
+         * @param height Amplitude of the steps[m]
+         */
+        void steps(double widths, double heights)
+        {
+#pragma omp parallel for schedule(auto)
+            for (int i = 0; i < num_envs_; i++)
+                environments_[i]->steps(widths, heights);
+        }
+
+        /**
+         * @brief Generates a terrain made of a slope.
+         *
+         * @param slope  The slope of the slope [m]
+         */
+        void slope(double slope, double roughness)
+        {
+#pragma omp parallel for schedule(auto)
+            for (int i = 0; i < num_envs_; i++)
+                environments_[i]->slope(slope, roughness);
+        }
+
+        /**
+         * @brief Sets the robot command direction. This method is used when
+         * the robot command type is external.
+         *
+         * @param target_angle Angle to which the robot must move
+         * @param turning_direction Turning direction: 1 for clockwise, -1
+         * for counter-clockwise and to not rotate.
+         * @param stop The robot must not move.
+         */
+        void set_command(double direction_angle, double turning_direction, bool stop)
+        {
+#pragma omp parallel for schedule(auto)
+            for (int i = 0; i < num_envs_; i++)
+                environments_[i]->set_command(direction_angle, turning_direction, stop);
+        }
     };
 
-
-    class NormalDistribution {
+    class NormalDistribution
+    {
     public:
-    NormalDistribution() : normDist_(0.f, 1.f) {}
+        NormalDistribution() : normDist_(0.f, 1.f) {}
 
-    float sample() { return normDist_(gen_); }
-    void seed(int i) { gen_.seed(i); }
+        float sample() { return normDist_(gen_); }
+        void seed(int i) { gen_.seed(i); }
 
     private:
-    std::normal_distribution<float> normDist_;
-    static thread_local std::mt19937 gen_;
+        std::normal_distribution<float> normDist_;
+        static thread_local std::mt19937 gen_;
     };
     thread_local std::mt19937 raisim::NormalDistribution::gen_;
 
-
-    class NormalSampler {
+    class NormalSampler
+    {
     public:
-    NormalSampler(int dim) {
-        dim_ = dim;
-        normal_.resize(THREAD_COUNT);
-        seed(0);
-    }
-
-    void seed(int seed) {
-        // this ensures that every thread gets a different seed
-    #pragma omp parallel for schedule(static, 1)
-        for (int i = 0; i < THREAD_COUNT; i++)
-        normal_[0].seed(i + seed);
-    }
-
-    inline void sample(Eigen::Ref<EigenRowMajorMat> &mean,
-                        Eigen::Ref<EigenVec> &std,
-                        Eigen::Ref<EigenRowMajorMat> &samples,
-                        Eigen::Ref<EigenVec> &log_prob) {
-        int agentNumber = log_prob.rows();
-
-    #pragma omp parallel for schedule(auto)
-        for (int agentId = 0; agentId < agentNumber; agentId++) {
-        log_prob(agentId) = 0;
-        for (int i = 0; i < dim_; i++) {
-            const float noise = normal_[omp_get_thread_num()].sample();
-            samples(agentId, i) = mean(agentId, i) + noise * std(i);
-            log_prob(agentId) -= noise * noise * 0.5 + std::log(std(i));
+        NormalSampler(int dim)
+        {
+            dim_ = dim;
+            normal_.resize(THREAD_COUNT);
+            seed(0);
         }
-        log_prob(agentId) -= float(dim_) * 0.9189385332f;
+
+        void seed(int seed)
+        {
+// This ensures that every thread gets a different seed
+#pragma omp parallel for schedule(static, 1)
+            for (int i = 0; i < THREAD_COUNT; i++)
+                normal_[0].seed(i + seed);
         }
-    }
-    int dim_;
-    std::vector<NormalDistribution> normal_;
+
+        inline void sample(Eigen::Ref<EigenRowMajorMat> &mean,
+                           Eigen::Ref<EigenVec> &std,
+                           Eigen::Ref<EigenRowMajorMat> &samples,
+                           Eigen::Ref<EigenVec> &log_prob)
+        {
+            int agentNumber = log_prob.rows();
+
+#pragma omp parallel for schedule(auto)
+            for (int agentId = 0; agentId < agentNumber; agentId++)
+            {
+                log_prob(agentId) = 0;
+                for (int i = 0; i < dim_; i++)
+                {
+                    const float noise = normal_[omp_get_thread_num()].sample();
+                    samples(agentId, i) = mean(agentId, i) + noise * std(i);
+                    log_prob(agentId) -= noise * noise * 0.5 + std::log(std(i));
+                }
+                log_prob(agentId) -= float(dim_) * 0.9189385332f;
+            }
+        }
+        int dim_;
+        std::vector<NormalDistribution> normal_;
     };
 
 }
-
-#endif //SRC_RAISIMGYMVECENV_HPP

@@ -7,11 +7,15 @@
 
 #include <Eigen/Core>
 
-using Dtype=float;
-using EigenRowMajorMat=Eigen::Matrix<Dtype, -1, -1, Eigen::RowMajor>;
-using EigenVec=Eigen::Matrix<Dtype, -1, 1>;
-using EigenBoolVec=Eigen::Matrix<bool, -1, 1>;
+using Dtype = float;
+// Observations type
+using Obtype = std::map<std::string, Eigen::VectorXd>;
+
+using EigenVec = Eigen::Matrix<Dtype, -1, 1>;
+using EigenBoolVec = Eigen::Matrix<bool, -1, 1>;
+using EigenMapVec = Eigen::Matrix<Obtype, -1, 1, Eigen::RowMajor>;
+using EigenRowMajorMat = Eigen::Matrix<Dtype, -1, -1, Eigen::RowMajor>;
 
 extern int threadCount;
 
-#endif //RAISIM_RAISIMGYMTORCH_RAISIMGYMTORCH_ENV_ENVS_COMMON_H_
+#endif // RAISIM_RAISIMGYMTORCH_RAISIMGYMTORCH_ENV_ENVS_COMMON_H_

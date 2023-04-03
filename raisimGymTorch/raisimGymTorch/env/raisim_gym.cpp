@@ -14,51 +14,66 @@ using namespace raisim;
 int THREAD_COUNT = 1;
 
 #ifndef ENVIRONMENT_NAME
-  #define ENVIRONMENT_NAME RaisimGymEnv
+#define ENVIRONMENT_NAME RaisimGymEnv
 #endif
 
-PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
-  py::class_<VectorizedEnvironment<ENVIRONMENT>>(m, RSG_MAKE_STR(ENVIRONMENT_NAME))
-    .def(py::init<std::string, std::string>(), py::arg("resourceDir"), py::arg("cfg"))
-    .def("init", &VectorizedEnvironment<ENVIRONMENT>::init)
-    .def("reset", &VectorizedEnvironment<ENVIRONMENT>::reset)
-    .def("observe", &VectorizedEnvironment<ENVIRONMENT>::observe)
-    .def("step", &VectorizedEnvironment<ENVIRONMENT>::step)
-    .def("setSeed", &VectorizedEnvironment<ENVIRONMENT>::setSeed)
-    .def("rewardInfo", &VectorizedEnvironment<ENVIRONMENT>::getRewardInfo)
-    .def("close", &VectorizedEnvironment<ENVIRONMENT>::close)
-    .def("isTerminalState", &VectorizedEnvironment<ENVIRONMENT>::isTerminalState)
-    .def("setSimulationTimeStep", &VectorizedEnvironment<ENVIRONMENT>::setSimulationTimeStep)
-    .def("setControlTimeStep", &VectorizedEnvironment<ENVIRONMENT>::setControlTimeStep)
-    .def("getObDim", &VectorizedEnvironment<ENVIRONMENT>::getObDim)
-    .def("getActionDim", &VectorizedEnvironment<ENVIRONMENT>::getActionDim)
-    .def("getNumOfEnvs", &VectorizedEnvironment<ENVIRONMENT>::getNumOfEnvs)
-    .def("turnOnVisualization", &VectorizedEnvironment<ENVIRONMENT>::turnOnVisualization)
-    .def("turnOffVisualization", &VectorizedEnvironment<ENVIRONMENT>::turnOffVisualization)
-    .def("stopRecordingVideo", &VectorizedEnvironment<ENVIRONMENT>::stopRecordingVideo)
-    .def("startRecordingVideo", &VectorizedEnvironment<ENVIRONMENT>::startRecordingVideo)
-    .def("curriculumUpdate", &VectorizedEnvironment<ENVIRONMENT>::curriculumUpdate)
-    .def("getObStatistics", &VectorizedEnvironment<ENVIRONMENT>::getObStatistics)
-    .def("setObStatistics", &VectorizedEnvironment<ENVIRONMENT>::setObStatistics)
-    .def(py::pickle(
-        [](const VectorizedEnvironment<ENVIRONMENT> &p) { // __getstate__ --> Pickling to Python
-            /* Return a tuple that fully encodes the state of the object */
-            return py::make_tuple(p.getResourceDir(), p.getCfgString());
-        },
-        [](py::tuple t) { // __setstate__ - Pickling from Python
-            if (t.size() != 2) {
-              throw std::runtime_error("Invalid state!");
-            }
+PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m)
+{
+    // Class that represents the output of a step in the simulation
+    py::class_<step_t>(m, "Step")
+        .def_readwrite("observation", &step_t::observation)
+        .def_readwrite("reward", &step_t::reward)
+        .def_readwrite("done", &step_t::done)
+        .def_readwrite("info", &step_t::info);
 
-            /* Create a new C++ instance */
-            VectorizedEnvironment<ENVIRONMENT> p(t[0].cast<std::string>(), t[1].cast<std::string>());
+    // Class that represents the output of a step in the simulation
+    py::class_<statistics_t>(m, "Statistics")
+        .def_readwrite("mean", &statistics_t::mean)
+        .def_readwrite("var", &statistics_t::var)
+        .def_readwrite("count", &statistics_t::count);
 
-            return p;
-        }
-    ));
+    // Class to obtain samples from a normal distribution
+    py::class_<NormalSampler>(m, "NormalSampler")
+        .def(py::init<int>(), py::arg("dim"))
+        .def("seed", &NormalSampler::seed)
+        .def("sample", &NormalSampler::sample);
 
-  py::class_<NormalSampler>(m, "NormalSampler")
-    .def(py::init<int>(), py::arg("dim"))
-    .def("seed", &NormalSampler::seed)
-    .def("sample", &NormalSampler::sample);
+    py::class_<VectorizedEnvironment<ENVIRONMENT>>(m, RSG_MAKE_STR(ENVIRONMENT_NAME))
+        .def(
+            py::init<std::string, std::string, int, bool>(),
+            py::arg("resource_dir"), 
+            py::arg("cfg"), 
+            py::arg("port"), 
+            py::arg("normalize"))
+        .def("init", &VectorizedEnvironment<ENVIRONMENT>::init)
+        .def("reset", &VectorizedEnvironment<ENVIRONMENT>::reset)
+        .def("step", &VectorizedEnvironment<ENVIRONMENT>::step)
+        .def("get_statistics", &VectorizedEnvironment<ENVIRONMENT>::get_statistics)
+        .def("set_statistics", &VectorizedEnvironment<ENVIRONMENT>::set_statistics)
+        .def("hills", &VectorizedEnvironment<ENVIRONMENT>::hills)
+        .def("stairs", &VectorizedEnvironment<ENVIRONMENT>::stairs)
+        .def("cellular_steps", &VectorizedEnvironment<ENVIRONMENT>::cellular_steps)
+        .def("steps", &VectorizedEnvironment<ENVIRONMENT>::steps)
+        .def("slope", &VectorizedEnvironment<ENVIRONMENT>::slope)
+        .def("set_command", &VectorizedEnvironment<ENVIRONMENT>::set_command)
+        .def(py::pickle(
+            [](const VectorizedEnvironment<ENVIRONMENT> &p) { // __getstate__ --> Pickling to Python
+                /* Return a tuple that fully encodes the state of the object */
+                return py::make_tuple(p.get_resource_dir(), p.get_cfg_string());
+            },
+            [](py::tuple t) { // __setstate__ - Pickling from Python
+                if (t.size() != 2)
+                {
+                    throw std::runtime_error("Invalid state!");
+                }
+
+                /* Create a new C++ instance */
+                VectorizedEnvironment<ENVIRONMENT> p(
+                    t[0].cast<std::string>(),
+                    t[1].cast<std::string>(),
+                    t[2].cast<int>(),
+                    t[3].cast<int>());
+
+                return p;
+            }));
 }

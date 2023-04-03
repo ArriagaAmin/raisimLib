@@ -1,47 +1,57 @@
-#ifndef ENVCONFIGSTRUCT_HPP
-#define ENVCONFIGSTRUCT_HPP
+#pragma once
 
 /**
  * @brief Simulation environment configuration parameters
- * 
  */
-struct EnvConfig{
+struct EnvConfig
+{
     // Cartesian foot placement heuristic enabled/disabled
-    bool CARTESIAN_DELTA; 
+    bool CARTESIAN_DELTA;
+
     // Angular foot placement heuristic enabled/disabled
-    bool ANGULAR_DELTA; 
+    bool ANGULAR_DELTA;
 
     // Number of scans for each ring.
     int SCANS_PER_RING;
-    // Number of rings. 
-    int N_SCAN_RINGS; 
+
+    // Number of rings.
+    int N_SCAN_RINGS;
+
     // Innermost ring radius.
-    double FOOT_SCAN_RADIUS; 
+    double FOOT_SCAN_RADIUS;
 
     // Initial phase of the robot legs
-    double SIGMA_0[4]; 
+    double SIGMA_0[4];
+
     // Gait base frequency.
     double BASE_FREQUENCY;
+
     // Leg span.
-    double H; 
+    double H;
+
     // Horizontal offset of the leg.
-    double H_OFF; 
+    double H_OFF;
+
     // Vertical offset of the leg.
-    double V_OFF; 
+    double V_OFF;
+
     // Robot thigh length.
-    double THIGH_LEN; 
+    double THIGH_LEN;
+
     // Robot shank length.
-    double SHANK_LEN; 
+    double SHANK_LEN;
+
     double LEG_SPAN;
+
     // Differential time.
-    double CONTROL_DT; 
+    double CONTROL_DT;
+
     // Desired minimum speed of the robot.
-    double VEL_TH; 
+    double VEL_TH;
 
     // Maximum magnitude of the external force applied to the robot.
-    double EXTERNAL_FORCA_MAX_VALUE; 
-    // Time during which the external force will be applied to the robot.
-    double EXTERNAL_FORCA_TIME_THRESHOLD;
-};
+    double MAX_EXTERNAL_FORCE;
 
-#endif
+    // Time during which the external force will be applied to the robot.
+    double EXTERNAL_FORCE_TIME;
+};
