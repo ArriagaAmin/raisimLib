@@ -296,8 +296,12 @@ namespace raisim
         // Uniform distribution ranging from zero to one.
         std::uniform_real_distribution<> zero_one_real_dist_{0, 1};
         // Pseudo-random generator of 32-bit numbers.
-        std::mt19937 merssen_twister_{static_cast<unsigned int>(
-            std::chrono::steady_clock::now().time_since_epoch().count())};
+        std::mt19937 merssen_twister_{
+            static_cast<unsigned int>(
+            std::chrono::steady_clock::now().time_since_epoch().count()
+            )
+        };
+        
         // Pseudo-random generator of 32-bit numbers.
         thread_local static std::mt19937 random_gen_;
 
@@ -483,5 +487,4 @@ namespace raisim
         int get_action_dimension(void);
     };
 
-    thread_local std::mt19937 raisim::ENVIRONMENT::random_gen_;
 }
