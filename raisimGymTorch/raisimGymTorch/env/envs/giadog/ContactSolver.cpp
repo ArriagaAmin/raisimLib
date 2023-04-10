@@ -15,15 +15,21 @@ ContactSolver::ContactSolver(
     // Cycle through the names and get the ids
     for (int i = 0; i < thigh_names.size(); i++)
     {
-        thigh_ids_.push_back(this->anymal_->getBodyIdx(thigh_names[i]));
+        thigh_ids_.push_back(static_cast<int>(
+            this->anymal_->getBodyIdx(thigh_names[i])
+            ));
     };
     for (int i = 0; i < shank_names.size(); i++)
     {
-        shank_ids_.push_back(this->anymal_->getBodyIdx(shank_names[i]));
+        shank_ids_.push_back(static_cast<int>(
+            this->anymal_->getBodyIdx(shank_names[i])
+            ));
     };
     for (int i = 0; i < foot_names.size(); i++)
     {
-        foot_ids_.push_back(this->anymal_->getBodyIdx(foot_names[i]));
+        foot_ids_.push_back(static_cast<int>(
+            this->anymal_->getBodyIdx(foot_names[i]))
+        );
     };
 
     // Use a random distribution to generate the friction coefficients
@@ -33,7 +39,7 @@ ContactSolver::ContactSolver(
         fricction_coeff_mean,
         fricction_coeff_std);
     double foot_fricction_coeff;
-    this->foot_ground_friction.setZero(foot_ids_.size());
+    this->foot_ground_friction.setZero(static_cast<int>(foot_ids_.size()));
 
     // This is a little bit of a hack, but it works.
     // If you are going to use another robot, you will need to change
@@ -47,7 +53,7 @@ ContactSolver::ContactSolver(
     {
         std::string col_body_name;
         col_body_name = col_body.colObj->name;
-        int pos = col_body_name.find("/");
+        int pos = static_cast<int>(col_body_name.find("/"));
         std::string col_type = col_body_name.substr(pos - 4, 4);
 
         if (col_type == "foot")
@@ -93,7 +99,7 @@ void ContactSolver::contact_info(void)
 
     for (auto &contact : this->anymal_->getContacts())
     {
-        for (int i = 0; i < foot_ids_.size(); i++)
+        for (int i = 0; i < static_cast<int>(foot_ids_.size()); i++)
         {
             // if there is no contact, skip the contact
             // (The vector is already zero, so we don't need to do anything))
@@ -101,7 +107,7 @@ void ContactSolver::contact_info(void)
                 continue;
 
             // If not get the contact body id
-            int contact_body_idx = contact.getlocalBodyIndex();
+            int contact_body_idx = static_cast<int>(contact.getlocalBodyIndex());
 
             // If it is one of the thigh or shank, then set the contact state to 1
             if (contact_body_idx == thigh_ids_[i])

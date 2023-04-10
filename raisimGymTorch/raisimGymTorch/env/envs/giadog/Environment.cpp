@@ -70,7 +70,7 @@ namespace raisim
         this->anymal_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
         // Initialization
-        this->generalized_coord_dim_ = this->anymal_->getGeneralizedCoordinateDim();
+        this->generalized_coord_dim_ = static_cast<unsigned int>(this->anymal_->getGeneralizedCoordinateDim());
         this->generalized_coord_.setZero(this->generalized_coord_dim_);
         this->generalized_coord_init_.setZero(this->generalized_coord_dim_);
         this->generalized_coord_init_ << 0, 0, 0, 1.0, 0.0, 0.0, 0.0, 0.03,
@@ -84,7 +84,7 @@ namespace raisim
         this->curriculum_coeff_ = pow(this->curriculum_base_, pow(this->curriculum_decay_, this->epoch_));
 
         this->pos_target_.setZero(this->generalized_coord_dim_);
-        this->generalized_vel_dim_ = this->anymal_->getDOF();
+        this->generalized_vel_dim_ = static_cast<unsigned int>(this->anymal_->getDOF());
         this->n_joints_ = generalized_vel_dim_ - 6;
         this->anymal_->setGeneralizedForce(Eigen::VectorXd::Zero(this->generalized_vel_dim_));
         this->generalized_vel_.setZero(this->generalized_vel_dim_);
@@ -431,6 +431,10 @@ namespace raisim
         {
             return collision[0].getPosition()[2];
         }
+        else // This should never happen but just in case so the compiler doesn't complain
+        {
+            return nan("");
+        }
     }
 
     void ENVIRONMENT::set_pd_gains(void)
@@ -484,7 +488,8 @@ namespace raisim
         {
             this->current_command_mode_ = this->command_mode_;
         }
-
+        double x_size;
+        double y_size;
         switch (this->current_command_mode_)
         {
         case command_t::STRAIGHT:
@@ -503,8 +508,8 @@ namespace raisim
             }
 
             // Saturate the target_position_ to scale of the terrain.
-            double x_size = this->generator_.terrain_x_size;
-            double y_size = this->generator_.terrain_y_size;
+            x_size = this->generator_.terrain_x_size;
+            y_size = this->generator_.terrain_y_size;
             if (std::abs(this->target_position_[0]) > 0.9 * x_size / 2)
             {
                 this->target_position_[0] = 0.9 * this->target_position_[0] /
@@ -685,7 +690,7 @@ namespace raisim
             {
                 for (int i = 0; i < this->observations_[param.first].size(); i++)
                 {
-                    double noise = param.second * this->norm_dist_(this->random_gen_);
+                    noise = param.second * this->norm_dist_(this->random_gen_);
                     this->observations_[param.first](i) += noise;
                 }
             }
@@ -903,4 +908,6 @@ namespace raisim
 
         return false;
     }
+    
+    thread_local std::mt19937 raisim::ENVIRONMENT::random_gen_;
 }

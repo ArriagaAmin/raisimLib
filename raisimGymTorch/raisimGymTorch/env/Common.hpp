@@ -6,7 +6,7 @@
 #define RAISIM_RAISIMGYMTORCH_RAISIMGYMTORCH_ENV_ENVS_COMMON_H_
 
 #include <Eigen/Core>
-
+#include <map>
 using Dtype = float;
 // Observations type
 using Obtype = std::map<std::string, Eigen::VectorXd>;

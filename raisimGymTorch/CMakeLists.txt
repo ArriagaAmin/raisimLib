@@ -31,6 +31,10 @@ if (APPLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+elseif(WIN32)
+    find_package(OpenMP REQUIRED)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /openmp")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp")
 else ()
     find_package(OpenMP REQUIRED)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp")
@@ -77,16 +81,32 @@ set(RAISIMGYM_ENV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/raisimGymTorch/env/envs)
 
 ######## Env ##########
 FOREACH(subdir ${SUBDIRS})
-    pybind11_add_module(${subdir} raisimGymTorch/env/raisim_gym.cpp raisimGymTorch/env/Yaml.cpp)
+    message("building ${subdir}")
+    pybind11_add_module(${subdir}
+                        ${RAISIMGYM_ENV_DIR}/${subdir}/Environment.cpp
+                        ${RAISIMGYM_ENV_DIR}/${subdir}/ContactSolver.cpp
+                        ${RAISIMGYM_ENV_DIR}/${subdir}/ExternalForce.cpp
+                        ${RAISIMGYM_ENV_DIR}/${subdir}/HeightScanner.cpp
+                        ${RAISIMGYM_ENV_DIR}/${subdir}/WorldGenerator.cpp
+                        ${RAISIMGYM_ENV_DIR}/${subdir}/utils.cpp
+                        raisimGymTorch/env/raisim_gym.cpp 
+                        raisimGymTorch/env/Yaml.cpp
+                        )
     target_link_libraries(${subdir} PRIVATE raisim::raisim ${Dependencies})
     target_include_directories(${subdir} PUBLIC ${EIGEN3_INCLUDE_DIRS} ${RAISIMGYM_ENV_DIR}/${subdir} ${CMAKE_CURRENT_SOURCE_DIR}/raisimGymTorch/env)
-    target_compile_options(${subdir} PRIVATE -fPIC -O3 -flto -mno-avx2)
+    if (WIN32)
+        target_compile_options(${subdir} PRIVATE /D_USRDLL /MD /O2 /GL /arch:AVX)
+        #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX")
+    else()
+        target_compile_options(${subdir} PRIVATE -fPIC -O3 -flto -mno-avx2)
+    endif()
     target_compile_definitions(${subdir} PRIVATE "-DRAISIMGYM_TORCH_ENV_NAME=${subdir}")
     target_compile_definitions(${subdir} PRIVATE "$<$<CONFIG:Release>:EIGEN_NO_DEBUG>")
     target_compile_definitions(${subdir} PRIVATE EIGEN_DONT_PARALLELIZE)
 
     message("raisim os ${RAISIM_OS}")
     message("raisim arch ${RAISIM_ARCH}")
+
 
     if(${RAISIM_OS} STREQUAL "m1")
         if(${RAISIM_ARCH} STREQUAL "arm64")

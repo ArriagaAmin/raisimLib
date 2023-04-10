@@ -155,7 +155,7 @@ void WorldGenerator::steps(
     noise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
     noise.SetFractalOctaves(2);
     noise.SetFractalLacunarity(30.0);
-    noise.SetFrequency(0.01);
+    noise.SetFrequency(0.01f);
     noise.SetSeed(rand());
 
     std::vector<double> height_map(resolution * resolution);

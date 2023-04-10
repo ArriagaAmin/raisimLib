@@ -62,7 +62,7 @@ namespace raisim
         // Variance of each observation
         std::map<std::string, Eigen::VectorXd> var_;
         // Total samples performed
-        float count_ = 1e-4;
+        float count_ = 1e-4f;
 
         void update_statistics(Eigen::Ref<EigenMapVec> &observations, bool update)
         {
@@ -144,7 +144,11 @@ namespace raisim
                 this->count_ = total_count;
             }
 
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
 #pragma omp parallel for schedule(auto)
+#endif
             // Normalize each vector in each map
             for (int i = 0; i < this->num_envs_; i++)
             {
@@ -245,7 +249,11 @@ namespace raisim
         {
             std::vector<step_t> result(this->num_envs_);
 
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
 #pragma omp parallel for schedule(auto)
+#endif
             for (int i = 0; i < this->num_envs_; i++)
             {
                 step_t step_info = this->environments_[i]->step(actions.row(i));
@@ -302,7 +310,12 @@ namespace raisim
          */
         void hills(double frequencies, double amplitudes, double roughness)
         {
+// If windows use static schedule
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
 #pragma omp parallel for schedule(auto)
+#endif
             for (int i = 0; i < num_envs_; i++)
                 environments_[i]->hills(frequencies, amplitudes, roughness);
         }
@@ -315,7 +328,11 @@ namespace raisim
          */
         void stairs(double widths, double heights)
         {
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
 #pragma omp parallel for schedule(auto)
+#endif
             for (int i = 0; i < num_envs_; i++)
                 environments_[i]->stairs(widths, heights);
         }
@@ -328,7 +345,11 @@ namespace raisim
          */
         void cellular_steps(double frequencies, double amplitudes)
         {
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
 #pragma omp parallel for schedule(auto)
+#endif
             for (int i = 0; i < num_envs_; i++)
                 environments_[i]->cellular_steps(frequencies, amplitudes);
         }
@@ -341,7 +362,11 @@ namespace raisim
          */
         void steps(double widths, double heights)
         {
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
 #pragma omp parallel for schedule(auto)
+#endif
             for (int i = 0; i < num_envs_; i++)
                 environments_[i]->steps(widths, heights);
         }
@@ -353,7 +378,11 @@ namespace raisim
          */
         void slope(double slope, double roughness)
         {
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
 #pragma omp parallel for schedule(auto)
+#endif
             for (int i = 0; i < num_envs_; i++)
                 environments_[i]->slope(slope, roughness);
         }
@@ -369,7 +398,11 @@ namespace raisim
          */
         void set_command(double direction_angle, double turning_direction, bool stop)
         {
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
 #pragma omp parallel for schedule(auto)
+#endif
             for (int i = 0; i < num_envs_; i++)
                 environments_[i]->set_command(direction_angle, turning_direction, stop);
         }
@@ -414,7 +447,11 @@ namespace raisim
         {
             int agentNumber = log_prob.rows();
 
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
 #pragma omp parallel for schedule(auto)
+#endif
             for (int agentId = 0; agentId < agentNumber; agentId++)
             {
                 log_prob(agentId) = 0;

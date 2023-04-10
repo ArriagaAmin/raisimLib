@@ -5,7 +5,7 @@ HeightScanner::HeightScanner(
     raisim::ArticulatedSystem *anymal,
     const EnvConfig *env_config,
     std::vector<std::string> feet_link_names,
-    bool visualizable = false) : world_(world),
+    bool visualizable) : world_(world),
                                  anymal_(anymal),
                                  feet_link_names_(feet_link_names),
                                  visualizable_(visualizable)
@@ -13,7 +13,7 @@ HeightScanner::HeightScanner(
     this->n_scan_rings_ = env_config->N_SCAN_RINGS;
     this->scans_per_ring_ = env_config->SCANS_PER_RING;
     this->foot_scan_radius_ = env_config->FOOT_SCAN_RADIUS;
-    this->n_legs_ = feet_link_names_.size();
+    this->n_legs_ = static_cast<int>(feet_link_names_.size());
     this->feet_height_scan.setZero(n_scans_);
     this->current_feet_position.setZero(3 * n_legs_);
     this->scans_per_foot_ = scans_per_ring_ * n_scan_rings_ + 1;
@@ -21,8 +21,9 @@ HeightScanner::HeightScanner(
 
     for (int i = 0; i < feet_link_names.size(); i++)
     {
-        this->feet_frames_idx_.push_back(
-            this->anymal_->getFrameIdxByName(feet_link_names_[i]));
+        this->feet_frames_idx_.push_back(static_cast<int>(
+            this->anymal_->getFrameIdxByName(feet_link_names_[i])
+            ));
     };
 };
 
@@ -130,7 +131,7 @@ double HeightScanner::clearance_reward(const Eigen::Vector4d &foot_phases)
     for (int i = 0; i < this->n_legs_; i++)
     {
         double phi = foot_phases[i];
-        if (M_PI * 2 > phi > M_PI)
+        if (M_PI * 2 > phi && phi > M_PI)
         {
             n_swing_feet++;
             double max_height = this->feet_height_scan.segment(
