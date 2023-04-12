@@ -82,16 +82,17 @@ set(RAISIMGYM_ENV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/raisimGymTorch/env/envs)
 ######## Env ##########
 FOREACH(subdir ${SUBDIRS})
     message("building ${subdir}")
-    pybind11_add_module(${subdir}
-                        ${RAISIMGYM_ENV_DIR}/${subdir}/Environment.cpp
-                        ${RAISIMGYM_ENV_DIR}/${subdir}/ContactSolver.cpp
-                        ${RAISIMGYM_ENV_DIR}/${subdir}/ExternalForce.cpp
-                        ${RAISIMGYM_ENV_DIR}/${subdir}/HeightScanner.cpp
-                        ${RAISIMGYM_ENV_DIR}/${subdir}/WorldGenerator.cpp
-                        ${RAISIMGYM_ENV_DIR}/${subdir}/utils.cpp
-                        raisimGymTorch/env/raisim_gym.cpp 
-                        raisimGymTorch/env/Yaml.cpp
-                        )
+    pybind11_add_module(
+        ${subdir}
+        ${RAISIMGYM_ENV_DIR}/${subdir}/Environment.cpp
+        ${RAISIMGYM_ENV_DIR}/${subdir}/ContactSolver.cpp
+        ${RAISIMGYM_ENV_DIR}/${subdir}/ExternalForce.cpp
+        ${RAISIMGYM_ENV_DIR}/${subdir}/HeightScanner.cpp
+        ${RAISIMGYM_ENV_DIR}/${subdir}/WorldGenerator.cpp
+        ${RAISIMGYM_ENV_DIR}/${subdir}/utils.cpp
+        raisimGymTorch/env/raisim_gym.cpp 
+        raisimGymTorch/env/Yaml.cpp
+    )
     target_link_libraries(${subdir} PRIVATE raisim::raisim ${Dependencies})
     target_include_directories(${subdir} PUBLIC ${EIGEN3_INCLUDE_DIRS} ${RAISIMGYM_ENV_DIR}/${subdir} ${CMAKE_CURRENT_SOURCE_DIR}/raisimGymTorch/env)
     if (WIN32)

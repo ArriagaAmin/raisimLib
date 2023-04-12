@@ -21,19 +21,18 @@ namespace raisim
         this->env_config_.BASE_FREQUENCY = cfg["gait"]["base_frequency"].template As<double>();
         this->env_config_.CARTESIAN_DELTA = cfg["gait"]["cartesian_movement_heuristic"].template As<bool>();
 
-        this->p_max_ = cfg["robot"]["kp_max"].template As<double>();
-        this->p_min_ = cfg["robot"]["kp_min"].template As<double>();
-        this->d_max_ = cfg["robot"]["kd_max"].template As<double>();
-        this->d_min_ = cfg["robot"]["kd_min"].template As<double>();
         this->env_config_.H_OFF = cfg["robot"]["h_off"].template As<double>();
         this->env_config_.V_OFF = cfg["robot"]["v_off"].template As<double>();
+        this->p_max_ = cfg["robot"]["pd_gains"]["kp_max"].template As<double>();
+        this->p_min_ = cfg["robot"]["pd_gains"]["kp_min"].template As<double>();
+        this->d_max_ = cfg["robot"]["pd_gains"]["kd_max"].template As<double>();
+        this->d_min_ = cfg["robot"]["pd_gains"]["kd_min"].template As<double>();
         this->env_config_.LEG_SPAN = cfg["robot"]["leg_span"].template As<double>();
         this->env_config_.THIGH_LEN = cfg["robot"]["thigh_len"].template As<double>();
         this->env_config_.SHANK_LEN = cfg["robot"]["shank_lank"].template As<double>();
 
         this->noise_ = cfg["simulation"]["noise"].template As<bool>();
-        this->episode_duration_ = cfg["simulation"]["max_time"].template As<double>();
-        this->env_config_.CONTROL_DT = cfg["simulation"]["control_dt"].template As<double>();
+        this->episode_duration_ = cfg["simulation"]["episode_max_time"].template As<double>();
         this->variable_latency_ = cfg["simulation"]["latency"]["variable"].template As<bool>();
         this->env_config_.N_SCAN_RINGS = cfg["simulation"]["heigh_scan"]["n_scan_rings"].template As<int>();
         this->env_config_.SCANS_PER_RING = cfg["simulation"]["heigh_scan"]["scans_per_ring"].template As<int>();
@@ -43,13 +42,12 @@ namespace raisim
         this->env_config_.VEL_TH = cfg["train"]["reward"]["velocity_threshold"].template As<double>();
         this->env_config_.MAX_EXTERNAL_FORCE = cfg["train"]["max_external_force"].template As<double>();
         this->env_config_.EXTERNAL_FORCE_TIME = cfg["train"]["external_force_time"].template As<double>();
+        int curriculum_grows_start_ = cfg["train"]["curriculum_grows_start"].template As<int>();
+        int curriculum_grows_duration_ = cfg["train"]["curriculum_grows_duration"].template As<int>();
 
         this->spinning_ = cfg["control"]["spinning"].template As<bool>();
         this->command_mode_ = (command_t)cfg["control"]["command_mode"].template As<int>();
         this->change_facing_ = (command_t)cfg["control"]["change_facing"].template As<bool>();
-
-        int curriculum_grows_start_ = cfg["train"]["curriculum_grows_start"].template As<int>();
-        int curriculum_grows_duration_ = cfg["train"]["curriculum_grows_duration"].template As<int>();
 
         // Create world
         this->world_ = std::make_unique<raisim::World>();
@@ -185,6 +183,7 @@ namespace raisim
         srand(time(0));
 
         this->latency_ = cfg["simulation"]["latency"]["peak"].template As<double>();
+        this->env_config_.CONTROL_DT = 1 / this->latency_;
         double min_latency = cfg["simulation"]["latency"]["min"].template As<double>();
         double max_latency = cfg["simulation"]["latency"]["max"].template As<double>();
         std::array<double, 3> i{min_latency, this->latency_, max_latency};

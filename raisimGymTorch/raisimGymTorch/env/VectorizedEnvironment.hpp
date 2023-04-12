@@ -299,14 +299,11 @@ namespace raisim
         }
 
         /**
-         * @brief Create the training terrain that contains hills.
+         * @brief Create the terrain that contains hills.
          *
          * @param frequency How often each hill appears.
-         *      Recommended range: [0.00, 0.35]
          * @param amplitude Height of the hills.
-         *      Recommended range: [0.00, 2.00]
          * @param roughness Terrain roughness.
-         *      Recommended range: [0.00, 0.06]
          */
         void hills(double frequencies, double amplitudes, double roughness)
         {
@@ -321,7 +318,7 @@ namespace raisim
         }
 
         /**
-         * @brief Create the training terrain that contains stairs.
+         * @brief Create the terrain that contains stairs.
          *
          * @param width Width of each step.
          * @param height Height of each step.
@@ -338,7 +335,7 @@ namespace raisim
         }
 
         /**
-         * @brief Create the training terrain that contains stepped terrain
+         * @brief Create the terrain that contains stepped terrain
          *
          * @param frequency Frequency of the cellular noise
          * @param amplitude Scale to multiply the cellular noise
@@ -357,7 +354,7 @@ namespace raisim
         /**
          * @brief Generates a terrain made of steps (little square boxes)
          *
-         * @param width  Width of each of the steps [m]
+         * @param width Width of each of the steps [m]
          * @param height Amplitude of the steps[m]
          */
         void steps(double widths, double heights)
@@ -374,7 +371,8 @@ namespace raisim
         /**
          * @brief Generates a terrain made of a slope.
          *
-         * @param slope  The slope of the slope [m]
+         * @param slope The slope of the slope [m]
+         * @param roughness Terrain roughness.
          */
         void slope(double slope, double roughness)
         {
@@ -391,7 +389,7 @@ namespace raisim
          * @brief Sets the robot command direction. This method is used when
          * the robot command type is external.
          *
-         * @param target_angle Angle to which the robot must move
+         * @param direction_angle Angle to which the robot must move
          * @param turning_direction Turning direction: 1 for clockwise, -1
          * for counter-clockwise and to not rotate.
          * @param stop The robot must not move.
