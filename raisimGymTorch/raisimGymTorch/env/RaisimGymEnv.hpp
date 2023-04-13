@@ -25,7 +25,7 @@ namespace raisim
     {
         // Observing the state of the environment after applying the action.
         std::map<std::string, Eigen::VectorXd> observation;
-        // reward: The reward obtained for applying the action.
+        // The reward obtained for applying the action.
         double reward;
         // A boolean value indicating whether or not the episode has ended.
         bool done;

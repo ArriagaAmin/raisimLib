@@ -1,1 +1,5 @@
 rsg_*
+bin/*.so 
+bin/*.pyd 
+bin/*.lib 
+bin/*.exp

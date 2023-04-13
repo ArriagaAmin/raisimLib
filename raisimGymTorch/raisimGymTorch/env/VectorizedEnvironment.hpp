@@ -231,12 +231,24 @@ namespace raisim
          * @brief Restart all environments
          *
          * @param epoch Current train epoch
+         * @return std::vector<step_t>  Information returned in each environment
          */
-        void reset(int epoch)
+        std::vector<step_t> reset(int epoch)
         {
+            std::vector<step_t> result(this->num_envs_);
             this->epoch_ = epoch;
-            for (auto env : this->environments_)
-                env->reset(epoch);
+
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
+#pragma omp parallel for schedule(auto)
+#endif
+            for (int i = 0; i < this->num_envs_; i++)
+            {
+                step_t step_info = this->environments_[i]->reset(this->epoch_);
+                result[i] = step_info;
+            }
+            return result;
         }
 
         /**
