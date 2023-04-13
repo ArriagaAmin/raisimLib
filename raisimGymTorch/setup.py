@@ -9,6 +9,7 @@ from distutils.core import setup
 
 __CMAKE_PREFIX_PATH__ = None
 __DEBUG__ = False
+USE_EXTERNAL_RAISIM = False
 
 if "--CMAKE_PREFIX_PATH" in sys.argv:
     index = sys.argv.index('--CMAKE_PREFIX_PATH')
@@ -20,6 +21,11 @@ if "--Debug" in sys.argv:
     index = sys.argv.index('--Debug')
     sys.argv.remove("--Debug")
     __DEBUG__ = True
+
+if "--USE_EXTERNAL_RAISIM" in sys.argv:
+    index = sys.argv.index('--USE_EXTERNAL_RAISIM')
+    sys.argv.remove("--USE_EXTERNAL_RAISIM")
+    USE_EXTERNAL_RAISIM = True
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
@@ -47,6 +53,9 @@ class CMakeBuild(build_ext):
 
         cfg = 'Debug' if __DEBUG__ else 'Release'
         build_args = ['--config', cfg]
+
+        if USE_EXTERNAL_RAISIM:
+            cmake_args.append('-DUSE_EXTERNAL_RAISIM=ON')
 
         if platform.system() == "Windows":
             cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(cfg.upper(), extdir)]
