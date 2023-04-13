@@ -3,3 +3,7 @@ bin/*.so
 bin/*.pyd 
 bin/*.lib 
 bin/*.exp
+*.exp
+*.lib
+*.pyd
+*.so
