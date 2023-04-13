@@ -61,7 +61,8 @@ void WorldGenerator::stairs(
     double total_length,
     double total_width)
 {
-    int n = total_length / width;
+    int n = int(total_length / width);
+
     raisim::Ground *ground = this->world_->addGround();
 
     this->terrain_objects.push(ground);
@@ -117,7 +118,7 @@ void WorldGenerator::cellular_steps(
     noise.SetFractalType(FastNoiseLite::FractalType_Ridged);
     noise.SetCellularDistanceFunction(FastNoiseLite::CellularDistanceFunction_Euclidean);
     noise.SetCellularReturnType(FastNoiseLite::CellularReturnType_CellValue);
-    noise.SetFrequency(frequency);
+    noise.SetFrequency(float(frequency));
     noise.SetSeed(rand());
 
     // Gather noise data
