@@ -34,9 +34,9 @@ namespace raisim
         this->noise_ = cfg["simulation"]["noise"].template As<bool>();
         this->episode_duration_ = cfg["simulation"]["episode_max_time"].template As<double>();
         this->variable_latency_ = cfg["simulation"]["latency"]["variable"].template As<bool>();
-        this->env_config_.N_SCAN_RINGS = cfg["simulation"]["heigh_scan"]["n_scan_rings"].template As<int>();
-        this->env_config_.SCANS_PER_RING = cfg["simulation"]["heigh_scan"]["scans_per_ring"].template As<int>();
-        this->env_config_.FOOT_SCAN_RADIUS = cfg["simulation"]["heigh_scan"]["foot_scan_radius"].template As<double>();
+        this->env_config_.N_SCAN_RINGS = cfg["simulation"]["height_scan"]["n_scan_rings"].template As<int>();
+        this->env_config_.SCANS_PER_RING = cfg["simulation"]["height_scan"]["scans_per_ring"].template As<int>();
+        this->env_config_.FOOT_SCAN_RADIUS = cfg["simulation"]["height_scan"]["foot_scan_radius"].template As<double>();
         this->orientation_noise_std_ = cfg["simulation"]["orientation_noise_std"].template As<double>() * this->noise_;
 
         this->env_config_.VEL_TH = cfg["train"]["reward"]["velocity_threshold"].template As<double>();
@@ -60,7 +60,7 @@ namespace raisim
         // Add robot
         this->anymal_ = this->world_->addArticulatedSystem(
             resource_dir + "/giadog/mini_ros/urdf/spot.urdf",
-            "",
+            resource_dir + "/giadog/mini_ros/urdf/",
             {},
             raisim::COLLISION(2), // Collision group
             -1);
@@ -628,7 +628,6 @@ namespace raisim
         this->base_euler_ << body_orientation.roll + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
             body_orientation.pitch + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
             body_orientation.yaw + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_;
-
         this->height_scanner_.foot_scan(body_orientation.yaw);
 
         // This way the noise from the orientation is propagated to the
@@ -659,7 +658,7 @@ namespace raisim
         this->observations_["target_direction"] = this->target_direction_;
         this->observations_["turning_direction"][0] = this->turning_direction_;
         this->observations_["body_height"][0] = this->body_height_;
-        this->observations_["gravity_vector"] = this->target_direction_;
+        this->observations_["gravity_vector"] = this->gravity_vector_;
         this->observations_["linear_velocity"] = this->linear_vel_;
         this->observations_["angular_velocity"] = this->angular_vel_;
         this->observations_["joint_position"] = this->joint_position_;
@@ -672,14 +671,14 @@ namespace raisim
         this->observations_["joint_vel_hist"] = this->joint_vel_hist_;
         this->observations_["feet_target_hist"] - this->feet_target_hist_;
         this->observations_["terrain_normal"] = this->contact_solver_.terrain_normal;
-        this->observations_["feet_heihgt_scan"] = this->height_scanner_.feet_height_scan;
+        this->observations_["feet_height_scan"] = this->height_scanner_.feet_height_scan;
         this->observations_["foot_contact_forces"] = this->contact_solver_.foot_contact_forces;
         this->observations_["foot_contact_states"] = this->contact_solver_.foot_contact_states;
         this->observations_["shank_contact_states"] = this->contact_solver_.shank_contact_states;
         this->observations_["thigh_contact_states"] = this->contact_solver_.thigh_contact_states;
         this->observations_["foot_ground_fricction"] = this->contact_solver_.foot_ground_friction;
         this->observations_["external_force"] = this->external_force_applier_.external_force_base_frame;
-        this->observations_["pd_constant"] = this->pd_constants_;
+        this->observations_["pd_constants"] = this->pd_constants_;
 
         // Noise addition
         if (this->noise_)
