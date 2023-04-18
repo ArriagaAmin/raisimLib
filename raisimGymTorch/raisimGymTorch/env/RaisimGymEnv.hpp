@@ -39,7 +39,7 @@ namespace raisim
         // Environment where the simulation occurs.
         std::unique_ptr<raisim::World> world_;
         // Simulation differential time.
-        double simulation_dt_ = 0.001;
+        double simulation_dt_ = 0.01;
         // Controlator differential time. It must be greater than the
         // simulation time differential.
         double control_dt_ = 0.01;

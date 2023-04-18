@@ -284,8 +284,12 @@ namespace raisim
         int port_;
         // Indicates if the scans will be displayed.
         bool visualizable_ = false;
-        // Visual representation of the target position.
-        raisim::Visuals *visual_target_;
+        // Indicates which visual objects will be displayed
+        bool display_target_, display_direction_, display_turning_;
+        // Visual objects that will display environment data
+        raisim::Visuals *visual_target_, *direction_head_, *turning_head_;
+        // Visual objects that will display environment data
+        raisim::PolyLine *direction_body_, *turning_body_;
         // ID of the robot feet in the simulation
         std::set<size_t> foot_indexes_;
 
@@ -339,13 +343,10 @@ namespace raisim
         void update_target(void);
 
         /**
-         * @brief Updates the position of the visual target when command_mode
-         * is STRAIGHT. Calculates the height of the terrain at the new target
-         * position. Places the visual target at that position and that specific
-         * height.
+         * @brief Updates the position of the visual objects. 
          *
          */
-        void update_visual_target(void);
+        void update_visual_objects(void);
 
         /**
          * @brief Updates the environment observation.
@@ -421,11 +422,8 @@ namespace raisim
          * @brief Create the training terrain that contains hills.
          *
          * @param frequency How often each hill appears.
-         *      Recommended range: [0.00, 0.35]
          * @param amplitude Height of the hills.
-         *      Recommended range: [0.00, 2.00]
          * @param roughness Terrain roughness.
-         *      Recommended range: [0.00, 0.06]
          */
         void hills(double frequency, double amplitude, double roughness);
 

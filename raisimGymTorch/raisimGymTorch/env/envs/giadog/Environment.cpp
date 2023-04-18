@@ -32,12 +32,17 @@ namespace raisim
         this->env_config_.SHANK_LEN = cfg["robot"]["shank_lank"].template As<double>();
 
         this->noise_ = cfg["simulation"]["noise"].template As<bool>();
+        this->simulation_dt_ = cfg["simulation"]["simulation_dt"].template As<double>();
         this->episode_duration_ = cfg["simulation"]["episode_max_time"].template As<double>();
         this->variable_latency_ = cfg["simulation"]["latency"]["variable"].template As<bool>();
         this->env_config_.N_SCAN_RINGS = cfg["simulation"]["height_scan"]["n_scan_rings"].template As<int>();
         this->env_config_.SCANS_PER_RING = cfg["simulation"]["height_scan"]["scans_per_ring"].template As<int>();
         this->env_config_.FOOT_SCAN_RADIUS = cfg["simulation"]["height_scan"]["foot_scan_radius"].template As<double>();
         this->orientation_noise_std_ = cfg["simulation"]["orientation_noise_std"].template As<double>() * this->noise_;
+
+        this->display_target_ = cfg["simulation"]["display"]["target"].template As<bool>();
+        this->display_turning_ = cfg["simulation"]["display"]["turning"].template As<bool>();
+        this->display_direction_ = cfg["simulation"]["display"]["direction"].template As<bool>();
 
         this->env_config_.VEL_TH = cfg["train"]["reward"]["velocity_threshold"].template As<double>();
         this->env_config_.MAX_EXTERNAL_FORCE = cfg["train"]["max_external_force"].template As<double>();
@@ -173,9 +178,29 @@ namespace raisim
             this->server_->launchServer(port);
             if (this->command_mode_ == command_t::STRAIGHT)
             {
-                this->visual_target_ = this->server_->addVisualSphere("goal", 0.2, 0, 0, 1, 1);
+                if (this->display_target_)
+                {
+                    this->visual_target_ = this->server_->addVisualCylinder(
+                        "goal", 0.2, 7, 0, 1, 0, 0.5);
+                }
+                if (this->display_direction_)
+                {
+                    this->direction_body_ = this->server_->addVisualPolyLine(
+                        "direction_body");
+                    this->direction_head_ = this->server_->addVisualSphere(
+                        "direction_head", 0.02, 0, 1, 0, 1);
+                    this->direction_body_->setColor(0, 1, 0, 1);
+                }
+                if (this->display_turning_)
+                {
+                    this->turning_body_ = this->server_->addVisualPolyLine(
+                        "turning_body");
+                    this->turning_head_ = this->server_->addVisualSphere(
+                        "turning_head", 0.02, 1, 0, 0, 1);
+                    this->turning_body_->setColor(1, 0, 0, 1);
+                }
             }
-            this->height_scanner_.add_visual_indicators(this->server_.get());
+            // 1this->height_scanner_.add_visual_indicators(this->server_.get());
             this->server_->focusOn(this->anymal_);
         }
 
@@ -192,6 +217,17 @@ namespace raisim
             i.begin(),
             i.end(),
             w.begin()};
+
+        int sim_steps;
+        if (!this->variable_latency_)
+        {
+            this->control_dt_ = 1 / this->latency_;
+            this->env_config_.CONTROL_DT = this->control_dt_;
+            sim_steps = int(control_dt_ / simulation_dt_ + 1e-10);
+            double dt = this->control_dt_ / sim_steps;
+
+            this->world_->setTimeStep(dt);
+        }
 
         this->reset(0);
     }
@@ -292,7 +328,6 @@ namespace raisim
         }
         else
         {
-            this->control_dt_ = 1 / this->latency_;
             sim_steps = int(this->control_dt_ / simulation_dt_ + 1e-10);
         }
         for (int i = 0; i < sim_steps; i++)
@@ -422,9 +457,9 @@ namespace raisim
     double ENVIRONMENT::get_terrain_height(double x, double y)
     {
         const raisim::RayCollisionList &collision = this->world_->rayTest(
-            {x, y, 10},
-            {x, y, -1},
-            50.,
+            {x, y, 100},
+            {x, y, -100},
+            200.,
             true);
         if (collision.size() > 0)
         {
@@ -550,10 +585,6 @@ namespace raisim
         }
 
         this->update_target();
-        if (this->command_mode_ == command_t::STRAIGHT)
-        {
-            this->update_visual_target();
-        }
     }
 
     void ENVIRONMENT::update_target(void)
@@ -584,19 +615,74 @@ namespace raisim
                 this->turning_direction_ = 0;
             };
         }
+
+        this->update_visual_objects();
     }
 
-    void ENVIRONMENT::update_visual_target(void)
+    void ENVIRONMENT::update_visual_objects(void)
     {
         if (this->visualizable_)
         {
-            double target_height = this->get_terrain_height(
-                this->target_position_[0],
-                this->target_position_[1]);
-            this->visual_target_->setPosition(
-                this->target_position_[0],
-                this->target_position_[1],
-                target_height);
+            if (this->display_target_ && this->command_mode_ == command_t::STRAIGHT)
+            {
+                double new_x = this->target_position_[0];
+                double new_y = this->target_position_[1];
+                double target_height = nan("");
+
+                while (std::isnan(target_height))
+                {
+                    new_x = new_x * 0.95;
+                    new_y = new_y * 0.95;
+                    target_height = this->get_terrain_height(new_x, new_y);
+                }
+
+                this->visual_target_->setPosition(
+                    this->target_position_[0],
+                    this->target_position_[1],
+                    target_height);
+            }
+            if (this->display_direction_)
+            {
+                double scale = 0.3;
+
+                this->direction_body_->clearPoints();
+                this->direction_body_->addPoint(
+                    this->generalized_coord_.head(3) + Eigen::Vector3d(0, 0, 0.15));
+                Eigen::Vector2d tar_dir = (this->target_position_ - this->generalized_coord_.head(2))
+                                              .normalized();
+                Eigen::Vector3d direction_head_pos(
+                    this->generalized_coord_[0] + tar_dir[0] * scale,
+                    this->generalized_coord_[1] + tar_dir[1] * scale,
+                    this->generalized_coord_[2] + 0.15);
+                this->direction_body_->addPoint(direction_head_pos);
+                this->direction_head_->setPosition(
+                    direction_head_pos[0],
+                    direction_head_pos[1],
+                    direction_head_pos[2]);
+            }
+            if (this->display_turning_)
+            {
+                this->turning_body_->clearPoints();
+                if (this->turning_direction_ != 0)
+                {
+                    this->turning_body_->addPoint(
+                        this->generalized_coord_.head(3) + Eigen::Vector3d(0, 0, 0.15));
+                    this->turning_body_->addPoint(
+                        this->generalized_coord_.head(3) + Eigen::Vector3d(0, 0, 0.45));
+
+                    double z_pos = (this->turning_direction_ > 0) * 0.3;
+                    this->turning_head_->setPosition(
+                        this->generalized_coord_.head(3)[0],
+                        this->generalized_coord_.head(3)[1],
+                        this->generalized_coord_.head(3)[2] + 0.15 + z_pos);
+                }
+                else
+                {
+                    this->turning_head_->setPosition(0, 0, 100);
+                    this->turning_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                    this->turning_body_->addPoint(Eigen::Vector3d(0, 0, 201));
+                }
+            }
         };
     }
 
@@ -906,6 +992,6 @@ namespace raisim
 
         return false;
     }
-    
+
     thread_local std::mt19937 raisim::ENVIRONMENT::random_gen_;
 }

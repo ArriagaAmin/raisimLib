@@ -77,7 +77,7 @@ public:
         double frequency,
         double amplitude,
         double roughness,
-        double terrain_size = 4.0,
+        double terrain_size = 8.0,
         double roughness_resolution = 30.0,
         int resolution = 90);
 
@@ -106,7 +106,7 @@ public:
     void cellular_steps(
         double frequency,
         double amplitude,
-        double terrain_size = 4.0,
+        double terrain_size = 8.0,
         int resolution = 256);
 
     /**
@@ -120,7 +120,7 @@ public:
     void steps(
         double width,
         double height,
-        double terrain_size = 4.0,
+        double terrain_size = 8.0,
         int resolution = 512);
 
     /**
@@ -134,7 +134,7 @@ public:
     void slope(
         double slope,
         double roughness,
-        double terrain_size = 4.0,
+        double terrain_size = 8.0,
         int resolution = 90);
 
     /**
