@@ -148,18 +148,12 @@ namespace raisim
             cfg["robot"]["link_names"]["foot_names"]["back_left"].template As<std::string>(),
             cfg["robot"]["link_names"]["foot_names"]["back_right"].template As<std::string>()
         };
-
+    
         // Indices of the feet
         for (std::string name : shank_names)
         {
             this->foot_indexes_.insert(this->anymal_->getBodyIdx(name));
         }
-
-        // 
-        // this->foot_indexes_.insert(this->anymal_->getBodyIdx("back_right_lower_leg"));
-        // this->foot_indexes_.insert(this->anymal_->getBodyIdx("front_right_lower_leg"));
-        // this->foot_indexes_.insert(this->anymal_->getBodyIdx("back_left_lower_leg"));
-        // this->foot_indexes_.insert(this->anymal_->getBodyIdx("front_left_lower_leg"));
 
         this->contact_solver_ = ContactSolver(
             this->world_.get(),
