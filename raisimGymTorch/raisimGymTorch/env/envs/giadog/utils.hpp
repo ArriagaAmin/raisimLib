@@ -62,7 +62,7 @@ std::tuple<
     Eigen::Vector4d>
 control_pipeline(
     Eigen::VectorXd action,
-    double turn_dir,
+    int turn_dir,
     double command_dir,
     double roll,
     double pitch,
