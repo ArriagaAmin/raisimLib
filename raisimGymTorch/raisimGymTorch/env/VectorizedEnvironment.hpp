@@ -177,8 +177,8 @@ namespace raisim
         {
             Yaml::Parse(cfg_, cfg);
 
-            if (&cfg_["render"])
-                this->render_ = cfg_["render"].template As<bool>();
+            if (&cfg_["simulation"]["render"])
+                this->render_ = cfg_["simulation"]["render"].template As<bool>();
             init();
         }
 
@@ -194,11 +194,13 @@ namespace raisim
          */
         void init(void)
         {
-            THREAD_COUNT = cfg_["num_threads"].template As<int>();
+            THREAD_COUNT = cfg_["simulation"]["num_threads"].template As<int>();
             omp_set_num_threads(THREAD_COUNT);
-            this->num_envs_ = cfg_["num_envs"].template As<int>();
+            this->num_envs_ = cfg_["simulation"]["num_envs"].template As<int>();
+            RSINFO("ENVIRONMENTS COUNT: \033[1m" + std::to_string(this->num_envs_) + "\033[0m.");
 
             this->environments_.reserve(this->num_envs_);
+            RSINFO("Creating environments.");
             for (int i = 0; i < this->num_envs_; i++)
             {
                 this->environments_.push_back(new ChildEnvironment(
@@ -208,15 +210,10 @@ namespace raisim
                     this->port_));
             }
 
-            for (int i = 0; i < this->num_envs_; i++)
-            {
-                // Only the first environment is visualized
-                this->environments_[i]->reset(0);
-            }
-
             this->observation_dimensions_ = this->environments_[0]->get_observations_dimension();
             this->action_dim = this->environments_[0]->get_action_dimension();
 
+            RSINFO("Normalize: " + std::to_string(this->normalize_));
             if (this->normalize_)
             {
                 for (const auto &[key, value] : this->observation_dimensions_)

@@ -13,11 +13,12 @@ HeightScanner::HeightScanner(
     this->n_scan_rings_ = env_config->N_SCAN_RINGS;
     this->scans_per_ring_ = env_config->SCANS_PER_RING;
     this->foot_scan_radius_ = env_config->FOOT_SCAN_RADIUS;
+
     this->n_legs_ = static_cast<int>(feet_link_names_.size());
-    this->feet_height_scan.setZero(n_scans_);
-    this->current_feet_position.setZero(3 * n_legs_);
-    this->scans_per_foot_ = scans_per_ring_ * n_scan_rings_ + 1;
-    this->n_scans_ = this->scans_per_foot_ * n_legs_;
+    this->scans_per_foot_ = this->scans_per_ring_ * this->n_scan_rings_ + 1;
+    this->n_scans_ = this->scans_per_foot_ * this->n_legs_;
+    this->feet_height_scan.setZero(this->n_scans_);
+    this->current_feet_position.setZero(3 * this->n_legs_);
 
     for (int i = 0; i < feet_link_names.size(); i++)
     {
