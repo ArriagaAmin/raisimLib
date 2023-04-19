@@ -41,8 +41,12 @@ namespace raisim
         this->orientation_noise_std_ = cfg["simulation"]["orientation_noise_std"].template As<double>() * this->noise_;
 
         this->display_target_ = cfg["simulation"]["display"]["target"].template As<bool>();
+        this->display_height_ = cfg["simulation"]["display"]["height"].template As<bool>();
         this->display_turning_ = cfg["simulation"]["display"]["turning"].template As<bool>();
         this->display_direction_ = cfg["simulation"]["display"]["direction"].template As<bool>();
+        this->display_x_component_ = cfg["simulation"]["display"]["x_component"].template As<bool>();
+        this->display_y_component_ = cfg["simulation"]["display"]["y_component"].template As<bool>();
+        this->display_z_component_ = cfg["simulation"]["display"]["z_component"].template As<bool>();
 
         this->env_config_.VEL_TH = cfg["train"]["reward"]["velocity_threshold"].template As<double>();
         this->env_config_.MAX_EXTERNAL_FORCE = cfg["train"]["max_external_force"].template As<double>();
@@ -60,7 +64,7 @@ namespace raisim
 
         // Create default terrain
         this->generator_ = WorldGenerator(this->world_.get(), this->anymal_);
-        this->generator_.hills(0.0, 0.0, 0.0);
+        this->hills(0.0, 0.0, 0.0);
 
         // Add robot
         this->anymal_ = this->world_->addArticulatedSystem(
@@ -88,6 +92,7 @@ namespace raisim
 
         this->pos_target_.setZero(this->generalized_coord_dim_);
         this->generalized_vel_dim_ = static_cast<unsigned int>(this->anymal_->getDOF());
+        RSINFO("VELOCITY DIMENSIONS: " + std::to_string(generalized_vel_dim_));
         this->n_joints_ = generalized_vel_dim_ - 6;
         this->anymal_->setGeneralizedForce(Eigen::VectorXd::Zero(this->generalized_vel_dim_));
         this->generalized_vel_.setZero(this->generalized_vel_dim_);
@@ -198,6 +203,36 @@ namespace raisim
                     this->turning_head_ = this->server_->addVisualSphere(
                         "turning_head", 0.02, 1, 0, 0, 1);
                     this->turning_body_->setColor(1, 0, 0, 1);
+                }
+                if (this->display_height_)
+                {
+                    this->height_line_ = this->server_->addVisualPolyLine(
+                        "height_line");
+                    this->height_line_->setColor(1, 1, 1, 1);
+                }
+                if (this->display_x_component_)
+                {
+                    this->x_component_body_ = this->server_->addVisualPolyLine(
+                        "x_component_body");
+                    this->x_component_head_ = this->server_->addVisualSphere(
+                        "x_component_head", 0.02, 1, 0, 0, 1);
+                    this->x_component_body_->setColor(1, 0, 0, 1);
+                }
+                if (this->display_y_component_)
+                {
+                    this->y_component_body_ = this->server_->addVisualPolyLine(
+                        "y_component_body");
+                    this->y_component_head_ = this->server_->addVisualSphere(
+                        "y_component_head", 0.02, 0, 1, 0, 1);
+                    this->y_component_body_->setColor(0, 1, 0, 1);
+                }
+                if (this->display_z_component_)
+                {
+                    this->z_component_body_ = this->server_->addVisualPolyLine(
+                        "z_component_body");
+                    this->z_component_head_ = this->server_->addVisualSphere(
+                        "z_component_head", 0.02, 0, 0, 1, 1);
+                    this->z_component_body_->setColor(0, 0, 1, 1);
                 }
             }
             // 1this->height_scanner_.add_visual_indicators(this->server_.get());
@@ -452,6 +487,36 @@ namespace raisim
         return 16;
     }
 
+    // TEST METHODS
+
+    void ENVIRONMENT::absolute_position_step(
+        double x,
+        double y,
+        double z,
+        double pitch,
+        double yaw,
+        double roll)
+    {
+        // Convert angles to radians
+        float pitchRad = glm::radians(pitch);
+        float rollRad = glm::radians(roll);
+        float yawRad = glm::radians(yaw);
+
+        // Create the quaternion
+        glm::quat q = glm::quat(glm::vec3(pitchRad, yawRad, rollRad));
+
+        this->generalized_coord_init_[0] = x;
+        this->generalized_coord_init_[1] = y;
+        this->generalized_coord_init_[2] = z;
+        this->generalized_coord_init_[3] = q.w;
+        this->generalized_coord_init_[4] = q.x;
+        this->generalized_coord_init_[5] = q.y;
+        this->generalized_coord_init_[6] = q.z;
+        this->anymal_->setState(
+            this->generalized_coord_init_,
+            this->generalized_vel_init_);
+    }
+
     // PRIVATE METHODS
 
     double ENVIRONMENT::get_terrain_height(double x, double y)
@@ -683,6 +748,61 @@ namespace raisim
                     this->turning_body_->addPoint(Eigen::Vector3d(0, 0, 201));
                 }
             }
+            if (this->display_height_)
+            {
+                this->height_line_->clearPoints();
+                this->height_line_->addPoint(this->generalized_coord_.head(3));
+                this->height_line_->addPoint(
+                    this->generalized_coord_.head(3) - Eigen::Vector3d(0, 0, this->body_height_));
+            }
+            if (this->display_x_component_)
+            {
+                this->x_component_body_->clearPoints();
+                this->x_component_body_->addPoint(
+                    this->generalized_coord_.head(3));
+
+                Eigen::Vector3d direction_head_pos(
+                    this->generalized_coord_[0] + this->x_component_vector_[0],
+                    this->generalized_coord_[1] + this->x_component_vector_[1],
+                    this->generalized_coord_[2] + this->x_component_vector_[2]);
+                this->x_component_body_->addPoint(direction_head_pos);
+                this->x_component_head_->setPosition(
+                    direction_head_pos[0],
+                    direction_head_pos[1],
+                    direction_head_pos[2]);
+            }
+            if (this->display_y_component_)
+            {
+                this->y_component_body_->clearPoints();
+                this->y_component_body_->addPoint(
+                    this->generalized_coord_.head(3));
+
+                Eigen::Vector3d direction_head_pos(
+                    this->generalized_coord_[0] + this->y_component_vector_[0],
+                    this->generalized_coord_[1] + this->y_component_vector_[1],
+                    this->generalized_coord_[2] + this->y_component_vector_[2]);
+                this->y_component_body_->addPoint(direction_head_pos);
+                this->y_component_head_->setPosition(
+                    direction_head_pos[0],
+                    direction_head_pos[1],
+                    direction_head_pos[2]);
+            }
+            if (this->display_z_component_)
+            {
+                this->z_component_body_->clearPoints();
+                this->z_component_body_->addPoint(
+                    this->generalized_coord_.head(3));
+
+                Eigen::Vector3d direction_head_pos(
+                    this->generalized_coord_[0] + this->gravity_vector_[0],
+                    this->generalized_coord_[1] + this->gravity_vector_[1],
+                    this->generalized_coord_[2] + this->gravity_vector_[2]);
+                this->z_component_body_->addPoint(direction_head_pos);
+                this->z_component_head_->setPosition(
+                    direction_head_pos[0],
+                    direction_head_pos[1],
+                    direction_head_pos[2]);
+            }
         };
     }
 
@@ -702,31 +822,32 @@ namespace raisim
         this->linear_vel_ = rot.e().transpose() * this->generalized_vel_.segment(0, 3);
         this->angular_vel_ = rot.e().transpose() * this->generalized_vel_.segment(3, 3);
 
-        Quaternion bd_quat;
-        bd_quat.w = this->generalized_coord_[3];
-        bd_quat.x = this->generalized_coord_[4];
-        bd_quat.y = this->generalized_coord_[5];
-        bd_quat.z = this->generalized_coord_[6];
-        EulerAngles body_orientation;
-        body_orientation = to_euler_angles(bd_quat);
-
-        /// Body orientation in euler angles
-        this->base_euler_ << body_orientation.roll + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
-            body_orientation.pitch + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
-            body_orientation.yaw + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_;
-        this->height_scanner_.foot_scan(body_orientation.yaw);
+        glm::quat q(
+            this->generalized_coord_[3],
+            this->generalized_coord_[4],
+            this->generalized_coord_[5],
+            this->generalized_coord_[6]);
 
         // This way the noise from the orientation is propagated to the
         // gravity vector
-        this->gravity_vector_ << -std::sin(body_orientation.pitch),
-            std::sin(body_orientation.roll) * std::cos(body_orientation.pitch),
-            std::cos(body_orientation.roll) * std::cos(body_orientation.pitch);
+        glm::mat4 R = glm::toMat3(q);
+        glm::vec3 x_vector = glm::vec3(R[0]);
+        glm::vec3 y_vector = glm::vec3(R[1]);
+        glm::vec3 gravity = glm::vec3(R[2]);
+        this->x_component_vector_ << x_vector.x, x_vector.y, x_vector.z;
+        this->y_component_vector_ << y_vector.x, y_vector.y, y_vector.z;
+        this->gravity_vector_ << -gravity.x, -gravity.y, -gravity.z;
+
+        /// Body orientation in euler angles
+        glm::vec3 euler = glm::eulerAngles(q);
+        this->base_euler_ << euler.z + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
+            euler.x + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
+            euler.y + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_;
+        this->height_scanner_.foot_scan(euler.y);
 
         const raisim::RayCollisionList &height_rt = world_->rayTest(
             {generalized_coord_[0], generalized_coord_[1], generalized_coord_[2]},
-            {-this->gravity_vector_[0],
-             -this->gravity_vector_[1],
-             -this->gravity_vector_[2]},
+            {generalized_coord_[0], generalized_coord_[1], generalized_coord_[2] - 50},
             50.,
             true,
             0,
@@ -963,7 +1084,7 @@ namespace raisim
         bool foot_contact = false;
 
         // Check if the robot is in a position where it might have fallen
-        if (this->gravity_vector_[2] < 0.6)
+        if (this->gravity_vector_[2] > -0.6)
         {
             // Iterate over all contacts of the robot
             for (raisim::Contact &contact : this->anymal_->getContacts())

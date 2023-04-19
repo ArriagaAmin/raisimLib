@@ -47,6 +47,9 @@ namespace raisim
         int action_dim = 0;
         // Indicates if a simulation will be displayed visually
         bool render_ = false;
+        // Indicates that the environment will restart automatically if it 
+        // detects that the robot falls
+        bool auto_reset = true;
         // String that contains the environment configuration
         std::string cfg_string_;
         // Directory where the resources needed to build the environment
@@ -175,10 +178,11 @@ namespace raisim
                                      normalize_(normalize),
                                      port_(port)
         {
-            Yaml::Parse(cfg_, cfg);
+            Yaml::Parse(this->cfg_, cfg);
 
-            if (&cfg_["simulation"]["render"])
-                this->render_ = cfg_["simulation"]["render"].template As<bool>();
+            this->auto_reset = this->cfg_["control"]["auto_reset"].template As<bool>();
+            if (&this->cfg_["simulation"]["render"])
+                this->render_ = this->cfg_["simulation"]["render"].template As<bool>();
             init();
         }
 
@@ -194,9 +198,9 @@ namespace raisim
          */
         void init(void)
         {
-            THREAD_COUNT = cfg_["simulation"]["num_threads"].template As<int>();
+            THREAD_COUNT = this->cfg_["simulation"]["num_threads"].template As<int>();
             omp_set_num_threads(THREAD_COUNT);
-            this->num_envs_ = cfg_["simulation"]["num_envs"].template As<int>();
+            this->num_envs_ = this->cfg_["simulation"]["num_envs"].template As<int>();
             RSINFO("ENVIRONMENTS COUNT: \033[1m" + std::to_string(this->num_envs_) + "\033[0m.");
 
             this->environments_.reserve(this->num_envs_);
@@ -267,7 +271,7 @@ namespace raisim
             {
                 step_t step_info = this->environments_[i]->step(actions.row(i));
                 result[i] = step_info;
-                if (step_info.done)
+                if (step_info.done && this->auto_reset)
                 {
                     this->environments_[i]->reset(this->epoch_);
                 }
@@ -412,6 +416,31 @@ namespace raisim
 #endif
             for (int i = 0; i < num_envs_; i++)
                 environments_[i]->set_command(direction_angle, turning_direction, stop);
+        }
+
+        /**
+         * @brief Allows to place the robot in a specific position
+         *
+         * @param x Absolute x position
+         * @param y Absolute y position
+         * @param z Absolute z position
+         *
+         */
+        void absolute_position_step(
+            double x,
+            double y,
+            double z,
+            double pitch,
+            double yaw,
+            double roll)
+        {
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
+#pragma omp parallel for schedule(auto)
+#endif
+            for (int i = 0; i < num_envs_; i++)
+                environments_[i]->absolute_position_step(x, y, z, pitch, yaw, roll);
         }
     };
 

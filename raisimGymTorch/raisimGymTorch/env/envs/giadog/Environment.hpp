@@ -8,6 +8,11 @@
 #include <time.h>
 #include <stdlib.h>
 #include <iostream>
+#include <glm/glm.hpp>
+#include <glm/common.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/euler_angles.hpp>
 
 #include "utils.hpp"
 #include "EnvConfig.hpp"
@@ -157,6 +162,10 @@ namespace raisim
         Eigen::VectorXd joint_velocity_;
         // Joint accelerations.
         Eigen::VectorXd joint_acceleration_;
+        // Vector parallel to the x component of the rotation matrix of the robot.
+        Eigen::Vector3d x_component_vector_;
+        // Vector parallel to the y component of the rotation matrix of the robot.
+        Eigen::Vector3d y_component_vector_;
         // Gravity vector. It is parallel to the z component of the
         // rotation matrix of the robot.
         Eigen::Vector3d gravity_vector_;
@@ -285,11 +294,15 @@ namespace raisim
         // Indicates if the scans will be displayed.
         bool visualizable_ = false;
         // Indicates which visual objects will be displayed
-        bool display_target_, display_direction_, display_turning_;
+        bool display_target_, display_direction_, display_turning_,
+            display_height_, display_x_component_, display_y_component_, 
+            display_z_component_;
         // Visual objects that will display environment data
-        raisim::Visuals *visual_target_, *direction_head_, *turning_head_;
+        raisim::Visuals *visual_target_, *direction_head_, *turning_head_,
+            *x_component_head_, *y_component_head_, *z_component_head_;
         // Visual objects that will display environment data
-        raisim::PolyLine *direction_body_, *turning_body_;
+        raisim::PolyLine *direction_body_, *turning_body_, *height_line_,
+            *x_component_body_, *y_component_body_, *z_component_body_;
         // ID of the robot feet in the simulation
         std::set<size_t> foot_indexes_;
 
@@ -302,10 +315,8 @@ namespace raisim
         // Pseudo-random generator of 32-bit numbers.
         std::mt19937 merssen_twister_{
             static_cast<unsigned int>(
-            std::chrono::steady_clock::now().time_since_epoch().count()
-            )
-        };
-        
+                std::chrono::steady_clock::now().time_since_epoch().count())};
+
         // Pseudo-random generator of 32-bit numbers.
         thread_local static std::mt19937 random_gen_;
 
@@ -343,7 +354,7 @@ namespace raisim
         void update_target(void);
 
         /**
-         * @brief Updates the position of the visual objects. 
+         * @brief Updates the position of the visual objects.
          *
          */
         void update_visual_objects(void);
@@ -471,18 +482,36 @@ namespace raisim
 
         /**
          * @brief Gets the dimensions of all observations
-         * 
-         * @return std::map<std::string, int> Map each dictionary to its 
+         *
+         * @return std::map<std::string, int> Map each dictionary to its
          * respective dimension
          */
         std::map<std::string, int> get_observations_dimension(void);
 
         /**
          * @brief Get action space dimension
-         * 
+         *
          * @return int Action space dimension
          */
         int get_action_dimension(void);
-    };
 
+        /**
+         * @brief Allows to place the robot in a specific position
+         *
+         * @param x Absolute x position
+         * @param y Absolute y position
+         * @param z Absolute z position
+         * @param pitch Pitch angle position
+         * @param yaw Yaw angle position
+         * @param roll Roll angle position
+         *
+         */
+        void absolute_position_step(
+            double x,
+            double y,
+            double z,
+            double pitch,
+            double yaw,
+            double roll);
+    };
 }
