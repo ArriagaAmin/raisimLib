@@ -40,13 +40,10 @@ ContactSolver::ContactSolver(
     };
 
     // Use a random distribution to generate the friction coefficients
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::normal_distribution<double> dis(
-        fricction_coeff_mean,
-        fricction_coeff_std);
-    double foot_fricction_coeff;
+    
     this->foot_ground_friction.setZero(static_cast<int>(foot_ids_.size()));
+
+    this->foot_link_names = foot_link_names;
 
     // This is a little bit of a hack, but it works.
     // If you are going to use another robot, you will need to change
@@ -84,22 +81,9 @@ ContactSolver::ContactSolver(
     //     }
     // }
 
-    int leg_index = 0;
-    for (std::string foot_name : foot_link_names)
-    {
-        raisim::CollisionDefinition foot_col_body = this->quadruped_->getCollisionBody(foot_name + "/0");
-        foot_fricction_coeff = dis(gen);
-        foot_col_body.setMaterial(foot_name);
-        this->world_->setMaterialPairProp(
-                "ground",
-                foot_name,
-                foot_fricction_coeff,
-                0,
-                0);
-        this->foot_ground_friction[leg_index] = foot_fricction_coeff;
-        leg_index++;
+    
 
-    }
+    this->set_feet_friction(fricction_coeff_mean, fricction_coeff_std);
 
 
     // We set the friction coefficient between the ground and the other
@@ -163,3 +147,32 @@ void ContactSolver::contact_info(void)
     this->undesirable_collisions_reward_ = -(
         this->shank_contact_states.sum() + this->thigh_contact_states.sum());
 };
+
+void ContactSolver::set_feet_friction(double fricction_coeff_mean, 
+                                      double fricction_coeff_std)
+                                    {
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::normal_distribution<double> dis(
+        fricction_coeff_mean,
+        fricction_coeff_std);
+    double foot_fricction_coeff;
+    
+    int leg_index = 0;
+    for (std::string foot_name : this->foot_link_names)
+    {
+        raisim::CollisionDefinition foot_col_body = this->quadruped_->getCollisionBody(foot_name + "/0");
+        foot_fricction_coeff = dis(gen);
+        foot_col_body.setMaterial(foot_name);
+        this->world_->setMaterialPairProp(
+                "ground",
+                foot_name,
+                foot_fricction_coeff,
+                0,
+                0);
+        this->foot_ground_friction[leg_index] = foot_fricction_coeff;
+        leg_index++;
+
+    }
+}

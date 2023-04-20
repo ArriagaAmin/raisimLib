@@ -25,6 +25,8 @@ private:
     // Id of objects that is in the simulation.
     std::vector<int> shank_ids_, thigh_ids_, foot_ids_, foot_links_ids_;
 
+    std::vector<std::string> foot_link_names;
+
 public:
     // Direction of the normal force on each leg of the robot.
     Eigen::VectorXd terrain_normal;
@@ -85,4 +87,15 @@ public:
      * This function is called every control time step.
      */
     void contact_info(void);
+
+    /**
+     * @brief Sets the friction forces on the robot's legs.
+     * 
+     * @param fricction_coeff_mean 
+     * @param fricction_coeff_std 
+     */
+    void set_feet_friction(
+        double fricction_coeff_mean,
+        double fricction_coeff_std
+    );
 };
