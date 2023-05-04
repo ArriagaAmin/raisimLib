@@ -296,13 +296,15 @@ namespace raisim
         // Indicates which visual objects will be displayed
         bool display_target_, display_direction_, display_turning_,
             display_height_, display_x_component_, display_y_component_, 
-            display_z_component_;
+            display_z_component_, display_linear_vel_, display_angular_vel_;
         // Visual objects that will display environment data
         raisim::Visuals *visual_target_, *direction_head_, *turning_head_,
-            *x_component_head_, *y_component_head_, *z_component_head_;
+            *x_component_head_, *y_component_head_, *z_component_head_,
+            *linear_vel_head_, *angular_vel_head_;
         // Visual objects that will display environment data
         raisim::PolyLine *direction_body_, *turning_body_, *height_line_,
-            *x_component_body_, *y_component_body_, *z_component_body_;
+            *x_component_body_, *y_component_body_, *z_component_body_,
+            *linear_vel_body_, *angular_vel_body_;
         // ID of the robot feet in the simulation
         std::set<size_t> foot_indexes_;
 
@@ -496,7 +498,8 @@ namespace raisim
         int get_action_dimension(void);
 
         /**
-         * @brief Allows to place the robot in a specific position
+         * @brief Allows to place the robot in a specific position. Parameters 
+         * with NaN values will be ignored and the current value will be placed
          *
          * @param x Absolute x position
          * @param y Absolute y position
@@ -506,12 +509,32 @@ namespace raisim
          * @param roll Roll angle position
          *
          */
-        void absolute_position_step(
+        void set_absolute_position(
             double x,
             double y,
             double z,
             double pitch,
             double yaw,
             double roll);
+
+        /**
+         * @brief Allows to set an absolute speed to the robot. Parameters 
+         * with NaN values will be ignored and the current value will be placed
+         *
+         * @param linear_x Absolute x linear velocity
+         * @param linear_y Absolute y linear velocity
+         * @param linear_z Absolute z linear velocity
+         * @param angular_x Absolute x angular velocity
+         * @param angular_y Absolute y angular velocity
+         * @param angular_z Absolute z angular velocity
+         *
+         */
+        void set_absolute_velocity(
+            double linear_x,
+            double linear_y,
+            double linear_z,
+            double angular_x,
+            double angular_y,
+            double angular_z);
     };
 }

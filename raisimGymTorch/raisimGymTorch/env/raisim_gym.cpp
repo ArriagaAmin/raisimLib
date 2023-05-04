@@ -56,7 +56,8 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m)
         .def("steps", &VectorizedEnvironment<ENVIRONMENT>::steps)
         .def("slope", &VectorizedEnvironment<ENVIRONMENT>::slope)
         .def("set_command", &VectorizedEnvironment<ENVIRONMENT>::set_command)
-        .def("absolute_position_step", &VectorizedEnvironment<ENVIRONMENT>::absolute_position_step)
+        .def("set_absolute_position", &VectorizedEnvironment<ENVIRONMENT>::set_absolute_position)
+        .def("set_absolute_velocity", &VectorizedEnvironment<ENVIRONMENT>::set_absolute_velocity)
         .def(py::pickle(
             [](const VectorizedEnvironment<ENVIRONMENT> &p) { // __getstate__ --> Pickling to Python
                 /* Return a tuple that fully encodes the state of the object */

@@ -47,7 +47,7 @@ namespace raisim
         int action_dim = 0;
         // Indicates if a simulation will be displayed visually
         bool render_ = false;
-        // Indicates that the environment will restart automatically if it 
+        // Indicates that the environment will restart automatically if it
         // detects that the robot falls
         bool auto_reset = true;
         // String that contains the environment configuration
@@ -424,9 +424,12 @@ namespace raisim
          * @param x Absolute x position
          * @param y Absolute y position
          * @param z Absolute z position
+         * @param pitch Pitch angle position
+         * @param yaw Yaw angle position
+         * @param roll Roll angle position
          *
          */
-        void absolute_position_step(
+        void set_absolute_position(
             double x,
             double y,
             double z,
@@ -440,7 +443,41 @@ namespace raisim
 #pragma omp parallel for schedule(auto)
 #endif
             for (int i = 0; i < num_envs_; i++)
-                environments_[i]->absolute_position_step(x, y, z, pitch, yaw, roll);
+                environments_[i]->set_absolute_position(x, y, z, pitch, yaw, roll);
+        }
+
+        /**
+         * @brief Allows to set an absolute speed to the robot
+         *
+         * @param linear_x Absolute x linear velocity
+         * @param linear_y Absolute y linear velocity
+         * @param linear_z Absolute z linear velocity
+         * @param angular_x Absolute x angular velocity
+         * @param angular_y Absolute y angular velocity
+         * @param angular_z Absolute z angular velocity
+         *
+         */
+        void set_absolute_velocity(
+            double linear_x,
+            double linear_y,
+            double linear_z,
+            double angular_x,
+            double angular_y,
+            double angular_z)
+        {
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
+#pragma omp parallel for schedule(auto)
+#endif
+            for (int i = 0; i < num_envs_; i++)
+                environments_[i]->set_absolute_velocity(
+                    linear_x,
+                    linear_y,
+                    linear_z,
+                    angular_x,
+                    angular_y,
+                    angular_z);
         }
     };
 

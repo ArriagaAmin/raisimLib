@@ -44,9 +44,11 @@ namespace raisim
         this->display_height_ = cfg["simulation"]["display"]["height"].template As<bool>();
         this->display_turning_ = cfg["simulation"]["display"]["turning"].template As<bool>();
         this->display_direction_ = cfg["simulation"]["display"]["direction"].template As<bool>();
+        this->display_linear_vel_ = cfg["simulation"]["display"]["linear_vel"].template As<bool>();
         this->display_x_component_ = cfg["simulation"]["display"]["x_component"].template As<bool>();
         this->display_y_component_ = cfg["simulation"]["display"]["y_component"].template As<bool>();
         this->display_z_component_ = cfg["simulation"]["display"]["z_component"].template As<bool>();
+        this->display_angular_vel_ = cfg["simulation"]["display"]["angular_vel"].template As<bool>();
 
         this->env_config_.VEL_TH = cfg["train"]["reward"]["velocity_threshold"].template As<double>();
         this->env_config_.MAX_EXTERNAL_FORCE = cfg["train"]["max_external_force"].template As<double>();
@@ -92,7 +94,6 @@ namespace raisim
 
         this->pos_target_.setZero(this->generalized_coord_dim_);
         this->generalized_vel_dim_ = static_cast<unsigned int>(this->anymal_->getDOF());
-        RSINFO("VELOCITY DIMENSIONS: " + std::to_string(generalized_vel_dim_));
         this->n_joints_ = generalized_vel_dim_ - 6;
         this->anymal_->setGeneralizedForce(Eigen::VectorXd::Zero(this->generalized_vel_dim_));
         this->generalized_vel_.setZero(this->generalized_vel_dim_);
@@ -195,6 +196,8 @@ namespace raisim
                     this->direction_head_ = this->server_->addVisualSphere(
                         "direction_head", 0.02, 0, 1, 0, 1);
                     this->direction_body_->setColor(0, 1, 0, 1);
+                    this->direction_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                    this->direction_body_->addPoint(Eigen::Vector3d(0, 0, 201));
                 }
                 if (this->display_turning_)
                 {
@@ -209,6 +212,8 @@ namespace raisim
                     this->height_line_ = this->server_->addVisualPolyLine(
                         "height_line");
                     this->height_line_->setColor(1, 1, 1, 1);
+                    this->height_line_->addPoint(Eigen::Vector3d(0, 0, 200));
+                    this->height_line_->addPoint(Eigen::Vector3d(0, 0, 201));
                 }
                 if (this->display_x_component_)
                 {
@@ -217,6 +222,8 @@ namespace raisim
                     this->x_component_head_ = this->server_->addVisualSphere(
                         "x_component_head", 0.02, 1, 0, 0, 1);
                     this->x_component_body_->setColor(1, 0, 0, 1);
+                    this->x_component_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                    this->x_component_body_->addPoint(Eigen::Vector3d(0, 0, 201));
                 }
                 if (this->display_y_component_)
                 {
@@ -225,6 +232,8 @@ namespace raisim
                     this->y_component_head_ = this->server_->addVisualSphere(
                         "y_component_head", 0.02, 0, 1, 0, 1);
                     this->y_component_body_->setColor(0, 1, 0, 1);
+                    this->y_component_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                    this->y_component_body_->addPoint(Eigen::Vector3d(0, 0, 201));
                 }
                 if (this->display_z_component_)
                 {
@@ -233,6 +242,28 @@ namespace raisim
                     this->z_component_head_ = this->server_->addVisualSphere(
                         "z_component_head", 0.02, 0, 0, 1, 1);
                     this->z_component_body_->setColor(0, 0, 1, 1);
+                    this->z_component_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                    this->z_component_body_->addPoint(Eigen::Vector3d(0, 0, 201));
+                }
+                if (this->display_linear_vel_)
+                {
+                    this->linear_vel_body_ = this->server_->addVisualPolyLine(
+                        "linear_vel_body");
+                    this->linear_vel_head_ = this->server_->addVisualSphere(
+                        "linear_vel_head", 0.02, 0, 1, 0, 1);
+                    this->linear_vel_body_->setColor(0, 1, 0, 1);
+                    this->linear_vel_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                    this->linear_vel_body_->addPoint(Eigen::Vector3d(0, 0, 201));
+                }
+                if (this->display_angular_vel_)
+                {
+                    this->angular_vel_body_ = this->server_->addVisualPolyLine(
+                        "angular_vel_body");
+                    this->angular_vel_head_ = this->server_->addVisualSphere(
+                        "angular_vel_head", 0.02, 1, 0, 0, 1);
+                    this->angular_vel_body_->setColor(1, 0, 0, 1);
+                    this->angular_vel_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                    this->angular_vel_body_->addPoint(Eigen::Vector3d(0, 0, 201));
                 }
             }
             // 1this->height_scanner_.add_visual_indicators(this->server_.get());
@@ -489,7 +520,7 @@ namespace raisim
 
     // TEST METHODS
 
-    void ENVIRONMENT::absolute_position_step(
+    void ENVIRONMENT::set_absolute_position(
         double x,
         double y,
         double z,
@@ -497,21 +528,49 @@ namespace raisim
         double yaw,
         double roll)
     {
-        // Convert angles to radians
-        float pitchRad = glm::radians(pitch);
-        float rollRad = glm::radians(roll);
-        float yawRad = glm::radians(yaw);
+        this->generalized_coord_init_[0] = !std::isnan(x) ? x : this->generalized_coord_[0];
+        this->generalized_coord_init_[1] = !std::isnan(y) ? y : this->generalized_coord_[1];
+        this->generalized_coord_init_[2] = !std::isnan(z) ? z : this->generalized_coord_[2];
+
+        // We obtain the Euler angles of the current state
+        glm::quat q(
+            this->generalized_coord_[3],
+            this->generalized_coord_[4],
+            this->generalized_coord_[5],
+            this->generalized_coord_[6]
+        );
+        glm::vec3 euler_angles = glm::eulerAngles(q);
+        double real_pitch = !std::isnan(pitch) ? glm::radians(pitch) : euler_angles.x;
+        double real_yaw = !std::isnan(yaw) ? glm::radians(yaw) : euler_angles.y;
+        double real_roll = !std::isnan(roll) ? glm::radians(roll) : euler_angles.z;
 
         // Create the quaternion
-        glm::quat q = glm::quat(glm::vec3(pitchRad, yawRad, rollRad));
+        glm::quat real_q = glm::quat(glm::vec3(real_pitch, real_yaw, real_roll));
+        this->generalized_coord_init_[3] = real_q.w;
+        this->generalized_coord_init_[4] = real_q.x;
+        this->generalized_coord_init_[5] = real_q.y;
+        this->generalized_coord_init_[6] = real_q.z;
 
-        this->generalized_coord_init_[0] = x;
-        this->generalized_coord_init_[1] = y;
-        this->generalized_coord_init_[2] = z;
-        this->generalized_coord_init_[3] = q.w;
-        this->generalized_coord_init_[4] = q.x;
-        this->generalized_coord_init_[5] = q.y;
-        this->generalized_coord_init_[6] = q.z;
+
+        this->anymal_->setState(
+            this->generalized_coord_init_,
+            this->generalized_vel_init_);
+    }
+
+    void ENVIRONMENT::set_absolute_velocity(
+        double linear_x,
+        double linear_y,
+        double linear_z,
+        double angular_x,
+        double angular_y,
+        double angular_z)
+    {
+        this->generalized_vel_init_[0] = !std::isnan(linear_x) ? linear_x : this->generalized_vel_[0];
+        this->generalized_vel_init_[1] = !std::isnan(linear_y) ? linear_y : this->generalized_vel_[1];
+        this->generalized_vel_init_[2] = !std::isnan(linear_z) ? linear_z : this->generalized_vel_[2];
+        this->generalized_vel_init_[3] = !std::isnan(angular_x) ? angular_x : this->generalized_vel_[3];
+        this->generalized_vel_init_[4] = !std::isnan(angular_y) ? angular_y : this->generalized_vel_[4];
+        this->generalized_vel_init_[5] = !std::isnan(angular_z) ? angular_z : this->generalized_vel_[5];
         this->anymal_->setState(
             this->generalized_coord_init_,
             this->generalized_vel_init_);
@@ -799,6 +858,38 @@ namespace raisim
                     this->generalized_coord_[2] + this->gravity_vector_[2]);
                 this->z_component_body_->addPoint(direction_head_pos);
                 this->z_component_head_->setPosition(
+                    direction_head_pos[0],
+                    direction_head_pos[1],
+                    direction_head_pos[2]);
+            }
+            if (this->display_linear_vel_)
+            {
+                this->linear_vel_body_->clearPoints();
+                this->linear_vel_body_->addPoint(
+                    this->generalized_coord_.head(3));
+
+                Eigen::Vector3d direction_head_pos(
+                    this->generalized_coord_[0] + this->generalized_vel_[0],
+                    this->generalized_coord_[1] + this->generalized_vel_[1],
+                    this->generalized_coord_[2]);
+                this->linear_vel_body_->addPoint(direction_head_pos);
+                this->linear_vel_head_->setPosition(
+                    direction_head_pos[0],
+                    direction_head_pos[1],
+                    direction_head_pos[2]);
+            }
+            if (this->display_angular_vel_)
+            {
+                this->angular_vel_body_->clearPoints();
+                this->angular_vel_body_->addPoint(
+                    this->generalized_coord_.head(3));
+
+                Eigen::Vector3d direction_head_pos(
+                    this->generalized_coord_[0],
+                    this->generalized_coord_[1],
+                    this->generalized_coord_[2] + this->generalized_vel_[5]);
+                this->angular_vel_body_->addPoint(direction_head_pos);
+                this->angular_vel_head_->setPosition(
                     direction_head_pos[0],
                     direction_head_pos[1],
                     direction_head_pos[2]);
