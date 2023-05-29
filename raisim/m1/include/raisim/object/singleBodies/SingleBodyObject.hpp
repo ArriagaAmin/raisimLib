@@ -429,20 +429,20 @@ class SingleBodyObject : public Object {
 
   void preContactSolverUpdate1(const Vec<3> &gravity, double dt) final;
   void preContactSolverUpdate2(const Vec<3> &gravity, double dt, contact::ContactProblems& problems) final;
-  void integrate(double dt, const Vec<3>& gravity) final;
+  void integrate(double dt, const World* world) final;
   void getContactPointVel(size_t pointId, Vec<3> &vel) const final;
 
   void updateCollision() override;
 
   /**
    * Set the linear damping that the object experiences due to air
-   * @param[in] damping the damping coefficient
+   * @param[in] damping the damping coefficient in the body frame
    */
   void setLinearDamping(double damping);
 
   /**
-   * Set the angular damping that the object experiences due to air (proportional to the angular velocity)
-   * @param[in] damping the damping coefficient
+   * Set the angular damping that the object experiences due to air (proportional to the angular velocity).
+   * @param[in] damping the damping coefficient in the body frame
    */
   void setAngularDamping(Vec<3> damping);
 
@@ -510,6 +510,10 @@ class SingleBodyObject : public Object {
   void updateTimeStep(double dt) final {};
   void updateTimeStepIfNecessary(double dt) final {};
   void updateOrientation();
+  void eulerIntegrate(double dt,
+                      const Mat<3,3>& initialRotMat,
+                      const Vec<3>& initialAngVel,
+                      Vec<3>& finalAngVel);
 
 
   dGeomID collisionObject_;
@@ -534,10 +538,8 @@ class SingleBodyObject : public Object {
   Vec<3> comPosition_;
   Vec<3> body2com_;     // w.r.t body frame
 
-  // bullet pose
   /// bullet frame orientation always coincides with body frame
   Vec<3> colPosition_;
-  Vec<3> col2com_;     // w.r.t bullet frame
 
   // object velocity
   /// com velocity and angular velocity w.r.t com

@@ -4,6 +4,13 @@ Change Log
 Here we only describe the changes to the RaiSim library.
 Other peripheral codes are not tracked here.
 
+**v1.1.7**
+========================================
+Inverse dynamics pipeline using the recursive newton euler algorithm added.
+This allows users to compute the constrained forces and torques at the joints.
+IMU implementation added (check ``sensors`` example).
+Raisim is compiled with clang15
+
 **v1.1.6**
 ========================================
 The contact solver has been improved.

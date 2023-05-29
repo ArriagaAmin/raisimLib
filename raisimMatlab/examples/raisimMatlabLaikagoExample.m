@@ -14,7 +14,7 @@ end
 %%
 % set license file
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-raisim('license',  strcat(pwd, '/../../rsc/activation.raisim'));
+% raisim('license',  strcat(pwd, '/../../rsc/activation.raisim'));
 
 %%
 % initialize the world with a 

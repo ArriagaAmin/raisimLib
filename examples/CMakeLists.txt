@@ -59,6 +59,7 @@ create_executable(aliengo src/server/aliengo.cpp)
 create_executable(materials src/server/material.cpp)
 create_executable(materialStaticFriction src/server/materialStaticFriction.cpp)
 create_executable(heightMapUsingPng src/server/heightMapUsingPng.cpp)
+create_executable(dynamicHeightMap src/server/dynamicHeightMapUnrealOnly.cpp)
 create_executable(wheeledRobot src/server/wheeledRobot.cpp)
 create_executable(newtonsCradle src/server/newtonsCradle.cpp)
 create_executable(visualObjects src/server/visualObjects.cpp)
@@ -72,6 +73,9 @@ create_executable(trackedRobotAndTemplatedURDF src/server/trackedRobotAndTemplat
 create_executable(kinematicObject src/server/kinematicObject.cpp)
 create_executable(sensors src/server/sensors.cpp)
 create_executable(synchronousServerUpdate src/server/synchronousServerUpdate.cpp)
+create_executable(deletion src/server/deletion.cpp)
+create_executable(inverseDynamics src/server/inverseDynamics.cpp)
+create_executable(dzhanibekovEffect src/server/dzhanibekovEffect.cpp)
 
 # xml reader
 create_executable(xmlRader src/xml/xmlReader.cpp)
