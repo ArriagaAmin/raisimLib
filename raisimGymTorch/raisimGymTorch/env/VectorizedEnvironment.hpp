@@ -407,7 +407,7 @@ namespace raisim
          * for counter-clockwise and to not rotate.
          * @param stop The robot must not move.
          */
-        void set_command(double direction_angle, double turning_direction, bool stop)
+        void set_command(double direction_angle, int turning_direction, bool stop)
         {
 #ifdef _WIN32
 #pragma omp parallel for schedule(static)
@@ -415,7 +415,7 @@ namespace raisim
 #pragma omp parallel for schedule(auto)
 #endif
             for (int i = 0; i < num_envs_; i++)
-                environments_[i]->set_command(direction_angle, turning_direction, stop);
+                environments_[i]->set_command(direction_angle, int(turning_direction), stop);
         }
 
         /**
@@ -518,7 +518,7 @@ namespace raisim
                            Eigen::Ref<EigenRowMajorMat> &samples,
                            Eigen::Ref<EigenVec> &log_prob)
         {
-            int agentNumber = log_prob.rows();
+            int agentNumber = int (log_prob.rows());
 
 #ifdef _WIN32
 #pragma omp parallel for schedule(static)
@@ -532,7 +532,7 @@ namespace raisim
                 {
                     const float noise = normal_[omp_get_thread_num()].sample();
                     samples(agentId, i) = mean(agentId, i) + noise * std(i);
-                    log_prob(agentId) -= noise * noise * 0.5 + std::log(std(i));
+                    log_prob(agentId) -= float (noise * noise * 0.5 + std::log(std(i)));
                 }
                 log_prob(agentId) -= float(dim_) * 0.9189385332f;
             }
