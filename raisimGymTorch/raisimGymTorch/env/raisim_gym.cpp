@@ -3,9 +3,9 @@
 // Copyright 2020, RaiSim Tech//
 //----------------------------//
 
-#include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
+#include <pybind11/pybind11.h>
 #include "Environment.hpp"
 #include "VectorizedEnvironment.hpp"
 
@@ -32,12 +32,6 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m)
         .def_readwrite("var", &statistics_t::var)
         .def_readwrite("count", &statistics_t::count);
 
-    // Class to obtain samples from a normal distribution
-    py::class_<NormalSampler>(m, "NormalSampler")
-        .def(py::init<int>(), py::arg("dim"))
-        .def("seed", &NormalSampler::seed)
-        .def("sample", &NormalSampler::sample);
-
     py::class_<VectorizedEnvironment<ENVIRONMENT>>(m, RSG_MAKE_STR(ENVIRONMENT_NAME))
         .def(
             py::init<std::string, std::string, int, bool>(),
@@ -56,6 +50,7 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m)
         .def("steps", &VectorizedEnvironment<ENVIRONMENT>::steps)
         .def("slope", &VectorizedEnvironment<ENVIRONMENT>::slope)
         .def("set_command", &VectorizedEnvironment<ENVIRONMENT>::set_command)
+        .def("get_num_envs", &VectorizedEnvironment<ENVIRONMENT>::get_num_envs)
         .def("set_absolute_position", &VectorizedEnvironment<ENVIRONMENT>::set_absolute_position)
         .def("set_absolute_velocity", &VectorizedEnvironment<ENVIRONMENT>::set_absolute_velocity)
         .def(py::pickle(

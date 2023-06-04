@@ -419,6 +419,15 @@ namespace raisim
         }
 
         /**
+         * @brief Returns the number of parallel environments
+         *
+         */
+        int get_num_envs(void)
+        {
+            return num_envs_;
+        }
+
+        /**
          * @brief Allows to place the robot in a specific position
          *
          * @param x Absolute x position
