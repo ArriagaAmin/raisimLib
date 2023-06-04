@@ -130,11 +130,41 @@ namespace raisim
             this->action_mean_[i] = action_mean["frequency"].template As<double>();
         }
 
-        // Indices of links that should not make contact with ground
-        this->foot_indexes_.insert(this->anymal_->getBodyIdx("back_right_lower_leg"));
-        this->foot_indexes_.insert(this->anymal_->getBodyIdx("front_right_lower_leg"));
-        this->foot_indexes_.insert(this->anymal_->getBodyIdx("back_left_lower_leg"));
-        this->foot_indexes_.insert(this->anymal_->getBodyIdx("front_left_lower_leg"));
+        std::vector<std::string> hip_names = {
+            cfg["robot"]["link_names"]["hip_names"]["front_left"].template As<std::string>(),
+            cfg["robot"]["link_names"]["hip_names"]["front_right"].template As<std::string>(),
+            cfg["robot"]["link_names"]["hip_names"]["back_left"].template As<std::string>(),
+            cfg["robot"]["link_names"]["hip_names"]["back_right"].template As<std::string>()
+        };
+        
+
+        std::vector<std::string> thigh_names = {
+            cfg["robot"]["link_names"]["thigh_names"]["front_left"].template As<std::string>(),
+            cfg["robot"]["link_names"]["thigh_names"]["front_right"].template As<std::string>(),
+            cfg["robot"]["link_names"]["thigh_names"]["back_left"].template As<std::string>(),
+            cfg["robot"]["link_names"]["thigh_names"]["back_right"].template As<std::string>()
+
+        };
+
+        std::vector<std::string> shank_names = {
+            cfg["robot"]["link_names"]["shank_names"]["front_left"].template As<std::string>(),
+            cfg["robot"]["link_names"]["shank_names"]["front_right"].template As<std::string>(),
+            cfg["robot"]["link_names"]["shank_names"]["back_left"].template As<std::string>(),
+            cfg["robot"]["link_names"]["shank_names"]["back_right"].template As<std::string>()
+        };
+
+        std::vector<std::string> foot_names = {
+            cfg["robot"]["link_names"]["foot_names"]["front_left"].template As<std::string>(),
+            cfg["robot"]["link_names"]["foot_names"]["front_right"].template As<std::string>(),
+            cfg["robot"]["link_names"]["foot_names"]["back_left"].template As<std::string>(),
+            cfg["robot"]["link_names"]["foot_names"]["back_right"].template As<std::string>()
+        };
+    
+        // Indices of the feet
+        for (std::string name : shank_names)
+        {
+            this->foot_indexes_.insert(this->anymal_->getBodyIdx(name));
+        }
 
         this->contact_solver_ = ContactSolver(
             this->world_.get(),
@@ -142,18 +172,11 @@ namespace raisim
             this->world_->getTimeStep(),
             1.0, // Fricction coefficient mean
             0.2, // Fricction coefficient std
-            {"front_left_hip",
-             "front_right_hip",
-             "back_left_hip",
-             "back_right_hip"},
-            {"front_left_upper_leg",
-             "front_right_upper_leg",
-             "back_left_upper_leg",
-             "back_right_upper_leg"},
-            {"front_left_lower_leg",
-             "front_right_lower_leg",
-             "back_left_lower_leg",
-             "back_right_lower_leg"});
+            hip_names,
+            thigh_names,
+            shank_names,
+            foot_names
+            );
 
         this->base_euler_.setZero(3);
         this->FTG_phases_.setZero(4);
@@ -271,7 +294,7 @@ namespace raisim
         }
 
         // Initiate the random seed
-        srand(time(0));
+        srand(uint32_t (time(0)));
 
         this->latency_ = cfg["simulation"]["latency"]["peak"].template As<double>();
         this->env_config_.CONTROL_DT = 1 / this->latency_;
@@ -313,7 +336,7 @@ namespace raisim
             this->generalized_vel_init_);
 
         this->elapsed_time_ = 0.0;
-        this->elapsed_steps_ = 0.0;
+        this->elapsed_steps_ = 0;
         this->traverability_ = 0.0;
 
         // Re initialize external force applier
@@ -507,7 +530,7 @@ namespace raisim
         std::map<std::string, int> dimensions;
         for (const std::pair<const std::string, Eigen::VectorXd> &pair : this->observations_)
         {
-            dimensions[pair.first] = pair.second.size();
+            dimensions[pair.first] = int (pair.second.size());
         }
 
         return dimensions;
@@ -731,8 +754,8 @@ namespace raisim
 
             if (std::abs(this->target_angle_ - this->facing_angle_) > M_PI / 6)
             {
-                this->turning_direction_ = (this->target_angle_ - this->facing_angle_) /
-                                           std::abs(this->target_angle_ - this->facing_angle_);
+                this->turning_direction_ = int ((this->target_angle_ - this->facing_angle_) /
+                                           std::abs(this->target_angle_ - this->facing_angle_));
             }
             else
             {
@@ -1023,7 +1046,7 @@ namespace raisim
         // Torque reward
         // -------------------------------------------------------------------//
         double torque_reward_ = this->anymal_->getGeneralizedForce().e().tail(12).squaredNorm();
-        this->rewards_.record("torque", this->curriculum_coeff_ * torque_reward_);
+        this->rewards_.record("torque", float(this->curriculum_coeff_ * torque_reward_));
 
         // -------------------------------------------------------------------//
         // Linear Velocity Reward
@@ -1043,7 +1066,7 @@ namespace raisim
         {
             linear_vel_reward = 1.0;
         };
-        this->rewards_.record("linearVel", linear_vel_reward);
+        this->rewards_.record("linearVel", float (linear_vel_reward));
 
         // -------------------------------------------------------------------//
         // Angular Velocity Reward:
@@ -1067,7 +1090,7 @@ namespace raisim
         {
             angular_vel_reward = std::exp(-1.5 * std::pow(this->angular_vel_[2], 2));
         };
-        this->rewards_.record("angularVel", angular_vel_reward);
+        this->rewards_.record("angularVel", float(angular_vel_reward));
 
         // -------------------------------------------------------------------//
         // Base motion reward
@@ -1079,7 +1102,7 @@ namespace raisim
         w_2 = h_angular_vel.dot(h_angular_vel);
 
         base_motion_reward = std::exp(-1.5 * std::pow(ort_vel, 2)) + std::exp(-1.5 * w_2);
-        rewards_.record("baseMotion", base_motion_reward);
+        rewards_.record("baseMotion", float(base_motion_reward));
 
         // -------------------------------------------------------------------//
         // Body motion Reward:
@@ -1089,7 +1112,7 @@ namespace raisim
         double body_motion_reward;
         v_z = this->linear_vel_(2);
         body_motion_reward = std::exp(-1.5 * std::pow(v_z, 2)) + std::exp(-1.5 * w_2);
-        rewards_.record("bodyMotion", body_motion_reward);
+        rewards_.record("bodyMotion", float(body_motion_reward));
 
         // -------------------------------------------------------------------//
         // Linear Orthogonal Velocity Reward:
@@ -1101,7 +1124,7 @@ namespace raisim
         ort_vel = (h_linear_vel - this->target_direction_ * proj_linear_vel).norm();
 
         linear_orthogonal_vel_reward = std::exp(-3 * std::pow(ort_vel, 2));
-        rewards_.record("linearOrthogonalVelocity", linear_orthogonal_vel_reward);
+        rewards_.record("linearOrthogonalVelocity", float(linear_orthogonal_vel_reward));
 
         // -------------------------------------------------------------------//
         // Body collision reward:
@@ -1111,7 +1134,7 @@ namespace raisim
         // feet are penalized.
         // -------------------------------------------------------------------//
         double collisions_reward = this->contact_solver_.undesirable_collisions_reward_;
-        this->rewards_.record("bodyCollision", this->curriculum_coeff_ * collisions_reward);
+        this->rewards_.record("bodyCollision", float(this->curriculum_coeff_ * collisions_reward));
 
         // -------------------------------------------------------------------//
         // Foot Clearance reward:
@@ -1120,7 +1143,7 @@ namespace raisim
         // foot higher than the surroundings to avoid collision
         // -------------------------------------------------------------------//
         double foot_clearance_reward = this->height_scanner_.clearance_reward(this->FTG_phases_);
-        this->rewards_.record("footClearance", foot_clearance_reward);
+        this->rewards_.record("footClearance", float(foot_clearance_reward));
 
         // -------------------------------------------------------------------//
         // Target Smoothness reward:
@@ -1137,7 +1160,7 @@ namespace raisim
                       .norm();
 
         smoothness_reward = -(tgs_1st + tgs_2nd);
-        this->rewards_.record("targetSmoothness", this->curriculum_coeff_ * smoothness_reward);
+        this->rewards_.record("targetSmoothness", float(this->curriculum_coeff_ * smoothness_reward));
 
         // -------------------------------------------------------------------//
         // Joint Motion Reward:
@@ -1147,7 +1170,7 @@ namespace raisim
         double joint_motion_reward;
         joint_motion_reward = -(0.01 * this->generalized_vel_.tail(12).squaredNorm() +
                                 this->joint_acceleration_.squaredNorm());
-        this->rewards_.record("jointMotion", this->curriculum_coeff_ * joint_motion_reward);
+        this->rewards_.record("jointMotion", float(this->curriculum_coeff_ * joint_motion_reward));
 
         // -------------------------------------------------------------------//
         // Slip Reward:
@@ -1158,14 +1181,14 @@ namespace raisim
         double slip_reward;
         slip_reward = -(this->height_scanner_.feet_speed_squared_.dot(
             this->contact_solver_.foot_contact_states));
-        this->rewards_.record("slip", this->curriculum_coeff_ * slip_reward);
+        this->rewards_.record("slip", float(this->curriculum_coeff_ * slip_reward));
 
         // -------------------------------------------------------------------//
         // Terminal Reward:
         //
         // Heavily penalizes the robot if it falls over.
         // -------------------------------------------------------------------//
-        this->rewards_.record("terminal", -10 * this->is_terminal_state());
+        this->rewards_.record("terminal", float(-10 * this->is_terminal_state()));
     }
 
     bool ENVIRONMENT::is_terminal_state(void)

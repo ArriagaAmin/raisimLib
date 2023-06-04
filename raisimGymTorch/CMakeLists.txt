@@ -9,6 +9,9 @@ SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${folder}/env/bin
 option(USE_EXTERNAL_RAISIM "Use external raisim library (i.e. The raisim build library is in other directory)" OFF)
 
 
+# Set the Eigen3 directory to: Eigen3_DIR=$RAISIM_WORKSPACE/thirdParty/Eigen3/share/eigen3/cmake
+set(Eigen3_DIR "$ENV{RAISIM_WORKSPACE}/thirdParty/Eigen3/share/eigen3/cmake")
+
 ######################
 ### help functions ###
 ######################
