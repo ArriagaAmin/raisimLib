@@ -29,11 +29,11 @@ HeightScanner::HeightScanner(
 
     // print the foot frames names and indices
 
-    for (int i = 0; i < this->n_legs_; i++)
-    {
-        RSINFO("Foot frame name: " + this->feet_link_names_[i]);
-        RSINFO("Foot frame index: " + std::to_string(this->feet_frames_idx_[i]));
-    };
+    // for (int i = 0; i < this->n_legs_; i++)
+    // {
+    //     RSINFO("Foot frame name: " + this->feet_link_names_[i]);
+    //     RSINFO("Foot frame index: " + std::to_string(this->feet_frames_idx_[i]));
+    // };
 };
 
 std::vector<Eigen::Vector2d> HeightScanner::footScanCoordinates_(

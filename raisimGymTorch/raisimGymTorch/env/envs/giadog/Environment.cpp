@@ -54,11 +54,11 @@ namespace raisim
         this->observations_noise_["joint_velocity"] = cfg["simulation"]["noise_std"]["joint_velocity"].template As<double>() * this->noise_;
         
         // print the noise values
-        RSINFO("Orientation noise: " << this->orientation_noise_std_);
-        RSINFO("Linear velocity noise: " << this->observations_noise_["linear_velocity"]);
-        RSINFO("Angular velocity noise: " << this->observations_noise_["angular_velocity"]);
-        RSINFO("Joint position noise: " << this->observations_noise_["joint_position"]);
-        RSINFO("Joint velocity noise: " << this->observations_noise_["joint_velocity"]);
+        //RSINFO("Orientation noise: " << this->orientation_noise_std_);
+        //RSINFO("Linear velocity noise: " << this->observations_noise_["linear_velocity"]);
+        //RSINFO("Angular velocity noise: " << this->observations_noise_["angular_velocity"]);
+        //RSINFO("Joint position noise: " << this->observations_noise_["joint_position"]);
+        //RSINFO("Joint velocity noise: " << this->observations_noise_["joint_velocity"]);
 
 
         this->display_target_ = cfg["simulation"]["display"]["target"].template As<bool>();
@@ -77,9 +77,11 @@ namespace raisim
         int curriculum_grows_start_ = cfg["train"]["curriculum_grows_start"].template As<int>();
         int curriculum_grows_duration_ = cfg["train"]["curriculum_grows_duration"].template As<int>();
 
+        this->traversability_min_speed_treshold_ = cfg["train"]["traversability_min_speed_treshold"].template As<double>();
+
         this->env_config_.ROBOT_LEG_CONFIG = cfg["robot"]["leg_config"].template As<std::string>();
 
-        RSINFO("Robot Leg config: " << this->env_config_.ROBOT_LEG_CONFIG);
+        //RSINFO("Robot Leg config: " << this->env_config_.ROBOT_LEG_CONFIG);
 
         this->spinning_ = cfg["control"]["spinning"].template As<bool>();
         this->command_mode_ = (command_t)cfg["control"]["command_mode"].template As<int>();
@@ -224,7 +226,7 @@ namespace raisim
             this->foot_indexes_.insert(this->anymal_->getBodyIdx(name));
         }
 
-        RSINFO("Initializing contact solver");
+        //RSINFO("Initializing contact solver");
 
         this->contact_solver_ = ContactSolver(
             this->world_.get(),
@@ -238,7 +240,7 @@ namespace raisim
             foot_names
             );
         
-        RSINFO("Contact solver set up successfully");
+        //RSINFO("Contact solver set up successfully");
         
 
         this->base_euler_.setZero(3);
@@ -254,7 +256,7 @@ namespace raisim
         this->feet_target_hist_.setZero(24);
         this->joint_pos_err_hist_.setZero(24);
 
-        RSINFO("Setting up height scanner");
+        //RSINFO("Setting up height scanner");
 
 
         std::vector<std::string> feet_parent_joints = {
@@ -270,13 +272,13 @@ namespace raisim
             feet_parent_joints,
             cfg["simulation"]["height_scan"]["render"].template As<bool>());
         
-        RSINFO("Height scanner set up successfully");
+        //RSINFO("Height scanner set up successfully");
 
         // visualize if it is the first environment
         
         if (this->visualizable_)
         {   
-            RSINFO("Setting up visualization components");
+            //RSINFO("Setting up visualization components");
             this->server_ = std::make_unique<raisim::RaisimServer>(this->world_.get());
             this->server_->launchServer(port);
             if (this->command_mode_ == command_t::STRAIGHT)
@@ -365,7 +367,7 @@ namespace raisim
             }
             this->height_scanner_.add_visual_indicators(this->server_.get());
             this->server_->focusOn(this->anymal_);
-            RSINFO("Simulation server and visualizers set up successfully.");
+            //RSINFO("Simulation server and visualizers set up successfully.");
         }
 
         // Initiate the random seed
@@ -392,11 +394,11 @@ namespace raisim
 
             this->world_->setTimeStep(dt);
         }
-        RSINFO("Simulation time step set to " << this->world_->getTimeStep() << " s");
-        RSINFO("Resetting simulation world");
+        //RSINFO("Simulation time step set to " << this->world_->getTimeStep() << " s");
+        //RSINFO("Resetting simulation world");
         this->reset(0);
 
-        RSINFO("Environment initialized");
+        //RSINFO("Environment initialized");
     }
 
     step_t ENVIRONMENT::reset(int epoch)
@@ -514,7 +516,7 @@ namespace raisim
 
         // Traversability calculation
         int traversability = (this->linear_vel_[0] * this->target_direction_[0] +
-                             this->linear_vel_[1] * this->target_direction_[1]) >= MIN_DESIRED_VEL;
+                             this->linear_vel_[1] * this->target_direction_[1]) >= this->traversability_min_speed_treshold_;
         this->traversability_ = (this->elapsed_steps_ * this->traversability_ +
                                 traversability) /
                                (this->elapsed_steps_ + 1);

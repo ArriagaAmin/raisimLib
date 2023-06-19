@@ -23,7 +23,6 @@
 #include "WorldGenerator.hpp"
 
 #define GOAL_RADIUS 0.2
-#define MIN_DESIRED_VEL 0.066
 
 /**
  * @brief Possible types of terrain.
@@ -184,6 +183,10 @@ namespace raisim
         ContactSolver contact_solver_;
         // External force applier to the robot base.
         ExternalForceApplier external_force_applier_;
+
+        // Minimun desired speed of the robot to consider it is fluently on the terrain
+        double traversability_min_speed_treshold_ = 0.066; // We set a default value of 0.066 m/s
+
         // Ability of the robot to transit the current terrain
         double traversability_;
         // Height of the robot body;

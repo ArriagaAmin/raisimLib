@@ -20,7 +20,7 @@ ContactSolver::ContactSolver(
     // Cycle through the names and get the ids
     // Note: We use the parent names because of the way raisim getBodyIdx method works.
     
-    RSINFO("Setting the contact ids")
+    //RSINFO("Setting the contact ids")
     for (int i = 0; i < thigh_parent_names.size(); i++)
     {
         thigh_ids_.push_back(static_cast<int>(
@@ -40,27 +40,27 @@ ContactSolver::ContactSolver(
         );
     };
 
-    // print the ids
-    printf("Thigh ids: ");
-    for (int i = 0; i < thigh_ids_.size(); i++)
-    {
-        printf("%d ", thigh_ids_[i]);
-    }
-    printf("\n");
+    // // print the ids
+    // printf("Thigh ids: ");
+    // for (int i = 0; i < thigh_ids_.size(); i++)
+    // {
+    //     printf("%d ", thigh_ids_[i]);
+    // }
+    // printf("\n");
 
-    printf("Shank ids: ");
-    for (int i = 0; i < shank_ids_.size(); i++)
-    {
-        printf("%d ", shank_ids_[i]);
-    }
-    printf("\n");
+    // printf("Shank ids: ");
+    // for (int i = 0; i < shank_ids_.size(); i++)
+    // {
+    //     printf("%d ", shank_ids_[i]);
+    // }
+    // printf("\n");
 
-    printf("Foot ids: ");
-    for (int i = 0; i < foot_ids_.size(); i++)
-    {
-        printf("%d ", foot_ids_[i]);
-    }
-    printf("\n");
+    // printf("Foot ids: ");
+    // for (int i = 0; i < foot_ids_.size(); i++)
+    // {
+    //     printf("%d ", foot_ids_[i]);
+    // }
+    // printf("\n");
 
 
     // Use a random distribution to generate the friction coefficients
@@ -68,45 +68,8 @@ ContactSolver::ContactSolver(
     this->foot_ground_friction.setZero(static_cast<int>(foot_ids_.size()));
 
     this->foot_link_names = foot_link_names;
-
-    // This is a little bit of a hack, but it works.
-    // If you are going to use another robot, you will need to change
-    // this. Use the this->quadruped_->getCollisionBodies() to get the
-    // collision bodies. Then use the col_body.colObj->name to get the
-    // name of the body. Ussually the names are self explanatory, but
-    // if you are using a different robot, you should check the names
-    // in the urdf file.
-    // int leg_index = 0;
-    // for (raisim::CollisionDefinition col_body : this->quadruped_->getCollisionBodies())
-    // {   
-    //     // TODO: This is a hack. Find a better way to do this.
-    //     std::string col_body_name;
-    //     col_body_name = col_body.colObj->name;
-    //     int pos = static_cast<int>(col_body_name.find("/"));
-    //     std::string col_type = col_body_name.substr(pos - 4, 4);
-
-    //     if (col_type == "foot")
-    //     {
-    //         col_body.setMaterial(col_body_name);
-
-    //         foot_fricction_coeff = dis(gen);
-    //         this->world_->setMaterialPairProp(
-    //             "ground",
-    //             col_body_name,
-    //             foot_fricction_coeff,
-    //             0,
-    //             0);
-    //         this->foot_ground_friction[leg_index] = foot_fricction_coeff;
-    //         leg_index++;
-    //     }
-    //     else
-    //     {
-    //         col_body.setMaterial("plastic");
-    //     }
-    // }
-
     
-    RSINFO("Setting the foot friction")
+    //RSINFO("Setting the foot friction")
     this->set_feet_friction(fricction_coeff_mean, fricction_coeff_std);
 
 
@@ -186,7 +149,7 @@ void ContactSolver::set_feet_friction(double fricction_coeff_mean,
     int leg_index = 0;
     for (std::string foot_name : this->foot_link_names)
     {   
-        RSINFO("Setting friction for foot: " + foot_name)
+        //RSINFO("Setting friction for foot: " + foot_name)
         raisim::CollisionDefinition foot_col_body = this->quadruped_->getCollisionBody(foot_name + "/0");
         foot_fricction_coeff = dis(gen);
         foot_col_body.setMaterial(foot_name);
