@@ -20,6 +20,7 @@ ContactSolver::ContactSolver(
     // Cycle through the names and get the ids
     // Note: We use the parent names because of the way raisim getBodyIdx method works.
     
+    RSINFO("Setting the contact ids")
     for (int i = 0; i < thigh_parent_names.size(); i++)
     {
         thigh_ids_.push_back(static_cast<int>(
@@ -38,6 +39,29 @@ ContactSolver::ContactSolver(
             this->quadruped_->getBodyIdx(foot_parent_names[i]))
         );
     };
+
+    // print the ids
+    printf("Thigh ids: ");
+    for (int i = 0; i < thigh_ids_.size(); i++)
+    {
+        printf("%d ", thigh_ids_[i]);
+    }
+    printf("\n");
+
+    printf("Shank ids: ");
+    for (int i = 0; i < shank_ids_.size(); i++)
+    {
+        printf("%d ", shank_ids_[i]);
+    }
+    printf("\n");
+
+    printf("Foot ids: ");
+    for (int i = 0; i < foot_ids_.size(); i++)
+    {
+        printf("%d ", foot_ids_[i]);
+    }
+    printf("\n");
+
 
     // Use a random distribution to generate the friction coefficients
     
@@ -82,7 +106,7 @@ ContactSolver::ContactSolver(
     // }
 
     
-
+    RSINFO("Setting the foot friction")
     this->set_feet_friction(fricction_coeff_mean, fricction_coeff_std);
 
 
@@ -161,7 +185,8 @@ void ContactSolver::set_feet_friction(double fricction_coeff_mean,
     
     int leg_index = 0;
     for (std::string foot_name : this->foot_link_names)
-    {
+    {   
+        RSINFO("Setting friction for foot: " + foot_name)
         raisim::CollisionDefinition foot_col_body = this->quadruped_->getCollisionBody(foot_name + "/0");
         foot_fricction_coeff = dis(gen);
         foot_col_body.setMaterial(foot_name);

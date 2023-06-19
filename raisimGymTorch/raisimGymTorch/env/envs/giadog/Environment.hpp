@@ -185,7 +185,7 @@ namespace raisim
         // External force applier to the robot base.
         ExternalForceApplier external_force_applier_;
         // Ability of the robot to transit the current terrain
-        double traverability_;
+        double traversability_;
         // Height of the robot body;
         double body_height_;
         // Orientation noise standard deviation.
@@ -261,7 +261,7 @@ namespace raisim
         // that is not part of the observations
         std::map<std::string, double> info_ = {
             // Ability of the robot to move through the terrain
-            {"traverability", 0.0},
+            {"traversability", 0.0},
             // Dimensionless number that classifies the robot's walk
             {"froude", 0.0},
             // Projected speed on movement command
