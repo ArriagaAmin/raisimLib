@@ -623,6 +623,119 @@ namespace raisim
 
     // TEST METHODS
 
+    void ENVIRONMENT::set_foot_positions_and_base_pose(const Eigen::Ref<EigenVec> &foot_pos,
+        double x,
+        double y,
+        double z,
+        double pitch,
+        double yaw,
+        double roll)
+    {
+        Eigen::VectorXd foot_pos_vec = foot_pos.cast<double>();
+
+        Eigen::VectorXd target_joint_angles = Eigen::VectorXd::Zero(12);
+        for (int i = 0; i < 4; i++)
+        {
+        double x = foot_pos_vec(i * 3);
+        double y = foot_pos_vec(i * 3 + 1) ;
+        double z = foot_pos_vec(i * 3 + 2);
+
+
+        Eigen::Vector3d r;
+        if (this->env_config_.USE_HORIZONTAL_FRAME){
+            x += 0;
+            y += this->env_config_.H_OFF * pow(-1, i);
+            z += -this->env_config_.LEG_SPAN * (1 - 0.225); 
+        }
+
+        double roll = this->base_euler_(0);
+        double pitch = this->base_euler_(1);
+
+        r = {
+            x * std::cos(pitch) + y * std::sin(pitch) * std::sin(roll) + z * std::sin(pitch) * std::cos(roll) + 0,
+            0 + y * std::cos(roll) - z * std::sin(roll),
+            -x * std::sin(pitch) + y * std::cos(pitch) * std::sin(roll) + z * std::cos(pitch) * std::cos(roll)};
+        
+        if (!this->env_config_.USE_HORIZONTAL_FRAME){
+            r(1) += this->env_config_.H_OFF * pow(-1, i);
+            r(2) += -this->env_config_.LEG_SPAN * (1 - 0.225); 
+        }
+
+        if ( (i == 2 || i == 3) && this->env_config_.ROBOT_LEG_CONFIG == "><"){
+            r(0) = -r(0);
+        }
+
+        bool right_leg = i == 1 || i == 3;
+  
+        // Asing the joint angles to the joint angle vector.
+        auto leg_joint_angles = solve_leg_IK(right_leg, r, &this->env_config_);
+
+        if ( (i == 2 || i == 3) && this->env_config_.ROBOT_LEG_CONFIG == "><"){
+            target_joint_angles(i * 3)     = leg_joint_angles[0];
+            target_joint_angles(i * 3 + 1) = -leg_joint_angles[1];
+            target_joint_angles(i * 3 + 2) = -leg_joint_angles[2];
+        }
+        else{  
+            target_joint_angles(i * 3)     = leg_joint_angles[0];
+            target_joint_angles(i * 3 + 1) = leg_joint_angles[1];
+            target_joint_angles(i * 3 + 2) = leg_joint_angles[2];
+        }  
+        }
+
+
+        int sim_steps = int(this->control_dt_ / simulation_dt_ + 1e-10);
+        this->pos_target_.tail(this->n_joints_) = target_joint_angles;
+        this->anymal_->setPdTarget(this->pos_target_, this->vel_target_);
+        this->joint_position_ = target_joint_angles;
+        for (int i = 0; i < sim_steps; i++)
+        {
+            if (this->server_)
+                this->server_->lockVisualizationServerMutex();
+            this->set_absolute_position(x, y, z, pitch, yaw, roll);
+            this->world_->integrate();
+            if (this->server_)
+                this->server_->unlockVisualizationServerMutex();
+        }
+        
+
+
+    }
+
+    
+
+    void ENVIRONMENT::set_gait_config(
+            double base_frequency,
+            double leg_1_phase,
+            double leg_2_phase,
+            double leg_3_phase,
+            double leg_4_phase,
+            double foot_vertical_span,
+            double angular_movement_delta,
+            double x_movement_delta,
+            double y_movement_delta,
+            double leg_span,
+            bool use_horizontal_frame
+        ){
+            this->env_config_.BASE_FREQUENCY  = !std::isnan(base_frequency) ? base_frequency : this->env_config_.BASE_FREQUENCY;
+
+            this->env_config_.SIGMA_0[0] = !std::isnan(leg_1_phase) ? leg_1_phase : this->env_config_.SIGMA_0[0];
+            this->env_config_.SIGMA_0[1] = !std::isnan(leg_2_phase) ? leg_2_phase : this->env_config_.SIGMA_0[1];
+            this->env_config_.SIGMA_0[2] = !std::isnan(leg_3_phase) ? leg_3_phase : this->env_config_.SIGMA_0[2];
+            this->env_config_.SIGMA_0[3] = !std::isnan(leg_4_phase) ? leg_4_phase : this->env_config_.SIGMA_0[3];
+
+            this->env_config_.H = !std::isnan(foot_vertical_span) ? foot_vertical_span : this->env_config_.H;
+            
+            this->env_config_.X_MOV_DELTA = !std::isnan(x_movement_delta) ? x_movement_delta : this->env_config_.X_MOV_DELTA;
+            this->env_config_.Y_MOV_DELTA = !std::isnan(y_movement_delta) ? y_movement_delta : this->env_config_.Y_MOV_DELTA;
+            this->env_config_.ANG_MOV_DELTA = !std::isnan(angular_movement_delta) ? angular_movement_delta : this->env_config_.ANG_MOV_DELTA;
+
+            this->env_config_.LEG_SPAN  = !std::isnan(leg_span) ? leg_span : this->env_config_.LEG_SPAN;
+
+            this->env_config_.USE_HORIZONTAL_FRAME = !std::isnan(use_horizontal_frame) ? use_horizontal_frame : this->env_config_.USE_HORIZONTAL_FRAME ;
+            
+
+        }
+
     void ENVIRONMENT::set_absolute_position(
         double x,
         double y,
@@ -654,6 +767,9 @@ namespace raisim
         this->generalized_coord_init_[5] = real_q.y;
         this->generalized_coord_init_[6] = real_q.z;
 
+        // Get the current velocity from raisim
+        this->generalized_coord_init_.tail(12) = this->joint_position_;
+        this->generalized_vel_init_.tail(12) = this->joint_velocity_;
 
         this->anymal_->setState(
             this->generalized_coord_init_,
