@@ -371,6 +371,7 @@ control_pipeline(
 
         Eigen::Vector3d r;
         if (config->USE_HORIZONTAL_FRAME){
+            roll = pitch = 0.0;
             x += 0;
             y += config->H_OFF * pow(-1, i);
             z += -config->LEG_SPAN * (1 - 0.225); 
@@ -386,6 +387,10 @@ control_pipeline(
         if (!config->USE_HORIZONTAL_FRAME){
             r(1) += config->H_OFF * pow(-1, i);
             r(2) += -config->LEG_SPAN * (1 - 0.225); 
+        }
+
+        if ( (i == 2 || i == 3) && config->ROBOT_LEG_CONFIG == "><"){
+            r(0) = -r(0);
         }
 
         bool right_leg = i == 1 || i == 3;
