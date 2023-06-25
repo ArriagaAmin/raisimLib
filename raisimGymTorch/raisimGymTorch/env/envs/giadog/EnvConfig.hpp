@@ -28,7 +28,7 @@ struct EnvConfig
     // Gait base frequency.
     double BASE_FREQUENCY;
 
-    // Leg span.
+    // Foot movement span.
     double H;
 
     // Horizontal offset of the leg.

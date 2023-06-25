@@ -54,7 +54,7 @@ Eigen::MatrixXd direction_deltas(
     bool add_angular_delta,
     EnvConfig *config)
 {
-    double LEG_SPAN = config->LEG_SPAN; // Leg span
+    double H = config->H; // Gaits foot vertical span
     double dt = config->CONTROL_DT;     // Control time step
     Eigen::MatrixXd delta = Eigen::MatrixXd::Zero(4, 3);
 
@@ -64,9 +64,9 @@ Eigen::MatrixXd direction_deltas(
 
         // Position delta
         position_delta(0) = config->X_MOV_DELTA * cos(command_dir) * dt * ftg_sine_phases(i) *
-                            ftg_freqs(i) * LEG_SPAN;
+                             H;
         position_delta(1) = config->Y_MOV_DELTA * sin(command_dir) * dt * ftg_sine_phases(i) *
-                            ftg_freqs(i) * LEG_SPAN;
+                             H;
 
         // Rotation delta
         Eigen::Vector3d rotation_delta(0.0, 0.0, 0.0);
@@ -76,9 +76,9 @@ Eigen::MatrixXd direction_deltas(
                          (i == 2) * theta + (i == 3) * (M_PI - theta);
 
         rotation_delta(0) = config->ANG_MOV_DELTA * -cos(phi_arc) * dt * ftg_sine_phases(i) *
-                            turn_dir * ftg_freqs(i) * LEG_SPAN;
+                            turn_dir *  H;
         rotation_delta(1) = config->ANG_MOV_DELTA * -sin(phi_arc) * dt * ftg_sine_phases(i) *
-                            turn_dir * ftg_freqs(i) * LEG_SPAN;
+                            turn_dir *  H;
 
         delta.row(i) += (position_delta * add_cartesian_delta +
                          rotation_delta * add_cartesian_delta);
