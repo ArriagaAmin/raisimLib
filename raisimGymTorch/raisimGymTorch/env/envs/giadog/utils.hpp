@@ -70,6 +70,22 @@ control_pipeline(
     EnvConfig *config);
 
 /**
+ * @brief Calculates the leg's inverse kinematics (joint angles from xyz
+ * coordinates).
+ *
+ * @param right_leg If true, the right leg is solved, otherwise the left leg
+ *      is solved.
+ * @param r Objective foot position in the H_i frame. (x,y,z) hip-to-foot
+ *      distances in each dimension
+ * @param config Simulation environment configuration parameters.
+ *
+ * @return Leg joint angles to reach the objective foot
+ *      position r. In the order:(Hip, Shoulder, Wrist). The joint angles are
+ *      expresed in radians.
+ */
+Eigen::Vector3d solve_leg_IK(bool right_leg, Eigen::Vector3d r, EnvConfig *config);
+
+/**
  * @brief Given an initial epoch `E` and a duration in epochs `D`, it returns
  * an approximation of the parameters `B`, `d` so that the recursion
  * `an = an-1 ^ d, a0 = B`, which can be expressed as the function

@@ -54,7 +54,7 @@ Eigen::MatrixXd direction_deltas(
     bool add_angular_delta,
     EnvConfig *config)
 {
-    double LEG_SPAN = config->LEG_SPAN; // Leg span
+    double H = config->H; // Gaits foot vertical span
     double dt = config->CONTROL_DT;     // Control time step
     Eigen::MatrixXd delta = Eigen::MatrixXd::Zero(4, 3);
 
@@ -63,10 +63,10 @@ Eigen::MatrixXd direction_deltas(
         Eigen::Vector3d position_delta(0.0, 0.0, 0.0);
 
         // Position delta
-        position_delta(0) = 1.7 * cos(command_dir) * dt * ftg_sine_phases(i) *
-                            ftg_freqs(i) * LEG_SPAN;
-        position_delta(1) = 1.02 * sin(command_dir) * dt * ftg_sine_phases(i) *
-                            ftg_freqs(i) * LEG_SPAN;
+        position_delta(0) = config->X_MOV_DELTA * cos(command_dir) * dt * ftg_sine_phases(i) *
+                             H;
+        position_delta(1) = config->Y_MOV_DELTA * sin(command_dir) * dt * ftg_sine_phases(i) *
+                             H;
 
         // Rotation delta
         Eigen::Vector3d rotation_delta(0.0, 0.0, 0.0);
@@ -75,10 +75,10 @@ Eigen::MatrixXd direction_deltas(
         double phi_arc = (i == 0) * -theta + (i == 1) * -(M_PI - theta) +
                          (i == 2) * theta + (i == 3) * (M_PI - theta);
 
-        rotation_delta(0) = 0.68 * -cos(phi_arc) * dt * ftg_sine_phases(i) *
-                            turn_dir * ftg_freqs(i) * LEG_SPAN;
-        rotation_delta(1) = 0.68 * -sin(phi_arc) * dt * ftg_sine_phases(i) *
-                            turn_dir * ftg_freqs(i) * LEG_SPAN;
+        rotation_delta(0) = config->ANG_MOV_DELTA * -cos(phi_arc) * dt * ftg_sine_phases(i) *
+                            turn_dir *  H;
+        rotation_delta(1) = config->ANG_MOV_DELTA * -sin(phi_arc) * dt * ftg_sine_phases(i) *
+                            turn_dir *  H;
 
         delta.row(i) += (position_delta * add_cartesian_delta +
                          rotation_delta * add_cartesian_delta);
@@ -90,27 +90,34 @@ Eigen::MatrixXd direction_deltas(
  * @brief Foot Trajectory Generator.
  *
  * @param sigma_i_0 Leg base phase.
- * @param t Elapsed time [s].
+ * @param t   Elapsed time [s].
  * @param f_i Frequency of the i-th leg.
+ * @param H   Foot vertical span. 
+ * ---------
+ *     o -- Max height
+ *     |        |
+ *     |        |
+ *     |        Vertical span
+ *     |        |
+ *     |        |
+ *     o -- Min height (ie floor)
  *
  * @return Foot Z position.
  * @return Foot phase.
  */
-std::pair<double, double> FTG(double sigma_i_0, double t, double f_i)
+std::pair<double, double> FTG(double sigma_i_0, double t, double f_i, double H)
 {
-    double H = 0.2;
     double position_z = 0.0;
-    double sigma_i, k, h;
+    double sigma_i, k;
 
     sigma_i = std::fmod(sigma_i_0 + t * (f_i), (2 * M_PI));
     k = 2 * (sigma_i - M_PI) / M_PI;
-    h = 0.6 * H;
 
     bool condition_1 = (k <= 1 && k >= 0);
     bool condition_2 = (k >= 1 && k <= 2);
 
-    position_z += h * (-2 * k * k * k + 3 * k * k) * condition_1;
-    position_z += h * (2 * k * k * k - 9 * k * k + 12 * k - 4) * condition_2;
+    position_z += H * (-2 * k * k * k + 3 * k * k) * condition_1;
+    position_z += H * (2 * k * k * k - 9 * k * k + 12 * k - 4) * condition_2;
 
     return {position_z, sigma_i};
 }
@@ -148,7 +155,7 @@ foot_trajectories(double t, Eigen::Vector4d frequencies, EnvConfig *config)
     {
         double f_i = frequencies[i] + config->BASE_FREQUENCY;
         std::pair<double, double>
-            ftg_result = FTG(config->SIGMA_0[i], t, f_i);
+            ftg_result = FTG(config->SIGMA_0[i], t, f_i, config->H);
         target_foot_positions(i) = ftg_result.first;
         double sigma_i = ftg_result.second;
         FTG_frequencies[i] = f_i;
@@ -343,7 +350,7 @@ control_pipeline(
         turn_dir,
         config->CARTESIAN_DELTA,
         config->ANGULAR_DELTA,
-        config);
+        config) ;
 
     Eigen::VectorXd feet_target_positions;
     feet_target_positions.setZero(12);
@@ -352,28 +359,56 @@ control_pipeline(
 
     for (int i = 0; i < 4; i++)
     {
-        Eigen::VectorXd foot_delta = dir_delta.row(i) * 0.5;
+        Eigen::VectorXd foot_delta = dir_delta.row(i);
 
         double x = foot_delta(0) + xyz_residuals(i * 3);
-        double y = foot_delta(1) + xyz_residuals(i * 3 + 1);
+        double y = foot_delta(1) + xyz_residuals(i * 3 + 1) ;
         double z = z_ftg(i) + foot_delta(2) + xyz_residuals(i * 3 + 2);
 
         feet_target_positions(i * 3) = x;
-        feet_target_positions(i * 3 + 1) = y;
-        feet_target_positions(i * 3 + 2) = z;
+        feet_target_positions(i * 3 + 1) = y ;
+        feet_target_positions(i * 3 + 2) = z ;
 
+        Eigen::Vector3d r;
+        if (config->USE_HORIZONTAL_FRAME){
+            roll = pitch = 0.0;
+            x += 0;
+            y += config->H_OFF * pow(-1, i);
+            z += -config->LEG_SPAN * (1 - 0.225); 
+        }
+
+        //roll = pitch = 0.0;
         // Transform the feet target position to the base horizontal frame
-        Eigen::Vector3d r = {
+        r = {
             x * std::cos(pitch) + y * std::sin(pitch) * std::sin(roll) + z * std::sin(pitch) * std::cos(roll) + 0,
-            0 + y * std::cos(roll) - z * std::sin(roll) + config->H_OFF * pow(-1, i),
-            -x * std::sin(pitch) + y * std::cos(pitch) * std::sin(roll) + z * std::cos(pitch) * std::cos(roll) - config->LEG_SPAN * (1 - 0.225)};
+            0 + y * std::cos(roll) - z * std::sin(roll),
+            -x * std::sin(pitch) + y * std::cos(pitch) * std::sin(roll) + z * std::cos(pitch) * std::cos(roll)};
+        
+        if (!config->USE_HORIZONTAL_FRAME){
+            r(1) += config->H_OFF * pow(-1, i);
+            r(2) += -config->LEG_SPAN * (1 - 0.225); 
+        }
+
+        if ( (i == 2 || i == 3) && config->ROBOT_LEG_CONFIG == "><"){
+            r(0) = -r(0);
+        }
 
         bool right_leg = i == 1 || i == 3;
+  
         // Asing the joint angles to the joint angle vector.
         auto leg_joint_angles = solve_leg_IK(right_leg, r, config);
-        joint_angles(i * 3) = leg_joint_angles[0];
-        joint_angles(i * 3 + 1) = leg_joint_angles[1];
-        joint_angles(i * 3 + 2) = leg_joint_angles[2];
+
+        if ( (i == 2 || i == 3) && config->ROBOT_LEG_CONFIG == "><"){
+            joint_angles(i * 3)     = leg_joint_angles[0];
+            joint_angles(i * 3 + 1) = -leg_joint_angles[1];
+            joint_angles(i * 3 + 2) = -leg_joint_angles[2];
+        }
+        else{  
+            joint_angles(i * 3)     = leg_joint_angles[0];
+            joint_angles(i * 3 + 1) = leg_joint_angles[1];
+            joint_angles(i * 3 + 2) = leg_joint_angles[2];
+        }
+        
     }
 
     return std::make_tuple(

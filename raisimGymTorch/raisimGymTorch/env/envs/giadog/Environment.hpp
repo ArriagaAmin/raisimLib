@@ -23,7 +23,6 @@
 #include "WorldGenerator.hpp"
 
 #define GOAL_RADIUS 0.2
-#define MIN_DESIRED_VEL 0.066
 
 /**
  * @brief Possible types of terrain.
@@ -184,8 +183,12 @@ namespace raisim
         ContactSolver contact_solver_;
         // External force applier to the robot base.
         ExternalForceApplier external_force_applier_;
+
+        // Minimun desired speed of the robot to consider it is fluently on the terrain
+        double traversability_min_speed_treshold_ = 0.066; // We set a default value of 0.066 m/s
+
         // Ability of the robot to transit the current terrain
-        double traverability_;
+        double traversability_;
         // Height of the robot body;
         double body_height_;
         // Orientation noise standard deviation.
@@ -261,7 +264,7 @@ namespace raisim
         // that is not part of the observations
         std::map<std::string, double> info_ = {
             // Ability of the robot to move through the terrain
-            {"traverability", 0.0},
+            {"traversability", 0.0},
             // Dimensionless number that classifies the robot's walk
             {"froude", 0.0},
             // Projected speed on movement command
@@ -536,5 +539,55 @@ namespace raisim
             double angular_x,
             double angular_y,
             double angular_z);
+        
+        /**
+         * @brief Allows to set the target foot positions of the robot and the 
+         * base position. This function is used to have the robot float in space and 
+         * to test the Inverse Kinematics algorithm
+         * 
+         * @param foot_pos Foot positions (a 12 element vector) represents the foot 
+         * positions in cartesian space
+         * The order is LF_xyz, RF_xyz, LB_xyz RB_xyz
+         * 
+         * @param x Absolute x position
+         * @param y Absolute y position
+         * @param z Absolute z position
+         * @param pitch Pitch angle position
+         * @param yaw Yaw angle position
+         * @param roll Roll angle position
+         * 
+         * 
+        */
+       void set_foot_positions_and_base_pose(
+        const Eigen::Ref<EigenVec> &foot_pos,
+        double x,
+        double y,
+        double z,
+        double pitch,
+        double yaw,
+        double roll
+        );
+
+        /**
+         * @brief Allows to set the gait configuration parameters "on the fly"
+         * This is to tune the quadruped gait interactively.
+         * 
+         * @param foot_pos
+         * 
+         * 
+        */
+       void set_gait_config(
+            double base_frequency,
+            double leg_1_phase,
+            double leg_2_phase,
+            double leg_3_phase,
+            double leg_4_phase,
+            double foot_vertical_span,
+            double angular_movement_delta,
+            double x_movement_delta,
+            double y_movement_delta,
+            double leg_span,
+            bool use_horizontal_frame
+        );
     };
 }
