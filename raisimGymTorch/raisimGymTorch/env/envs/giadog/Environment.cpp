@@ -12,24 +12,32 @@ namespace raisim
                     port_(port)
     {
         // Get config values
-        this->env_config_.H = cfg["gait"]["max_foot_height"].template As<double>();
+        this->env_config_.H = cfg["gait"]["foot_vertical_span"].template As<double>();
         this->env_config_.SIGMA_0[0] = cfg["gait"]["leg_1_phase"].template As<double>();
         this->env_config_.SIGMA_0[1] = cfg["gait"]["leg_2_phase"].template As<double>();
         this->env_config_.SIGMA_0[2] = cfg["gait"]["leg_3_phase"].template As<double>();
         this->env_config_.SIGMA_0[3] = cfg["gait"]["leg_4_phase"].template As<double>();
-        this->env_config_.ANGULAR_DELTA = cfg["gait"]["angular_movement_heuristic"].template As<bool>();
-        this->env_config_.BASE_FREQUENCY = cfg["gait"]["base_frequency"].template As<double>();
+        this->env_config_.ANGULAR_DELTA   = cfg["gait"]["angular_movement_heuristic"].template As<bool>();
+        this->env_config_.BASE_FREQUENCY  = cfg["gait"]["base_frequency"].template As<double>();
         this->env_config_.CARTESIAN_DELTA = cfg["gait"]["cartesian_movement_heuristic"].template As<bool>();
+        this->env_config_.USE_HORIZONTAL_FRAME = cfg["gait"]["use_horizontal_frame"].template As<bool>();
+        
+        this->env_config_.X_MOV_DELTA = cfg["gait"]["x_movement_delta"].template As<double>();
+        this->env_config_.Y_MOV_DELTA = cfg["gait"]["y_movement_delta"].template As<double>();
+        this->env_config_.ANG_MOV_DELTA = cfg["gait"]["angular_movement_delta"].template As<double>();
 
-        this->env_config_.H_OFF = cfg["robot"]["h_off"].template As<double>();
-        this->env_config_.V_OFF = cfg["robot"]["v_off"].template As<double>();
+        this->env_config_.H_OFF     = cfg["robot"]["h_off"].template As<double>();
+        this->env_config_.V_OFF     = cfg["robot"]["v_off"].template As<double>();
+        this->env_config_.LEG_SPAN  = cfg["robot"]["leg_span"].template As<double>();
+        this->env_config_.THIGH_LEN = cfg["robot"]["thigh_len"].template As<double>();
+        this->env_config_.SHANK_LEN = cfg["robot"]["shank_len"].template As<double>();
+        
+        
         this->p_max_ = cfg["robot"]["pd_gains"]["kp_max"].template As<double>();
         this->p_min_ = cfg["robot"]["pd_gains"]["kp_min"].template As<double>();
         this->d_max_ = cfg["robot"]["pd_gains"]["kd_max"].template As<double>();
         this->d_min_ = cfg["robot"]["pd_gains"]["kd_min"].template As<double>();
-        this->env_config_.LEG_SPAN = cfg["robot"]["leg_span"].template As<double>();
-        this->env_config_.THIGH_LEN = cfg["robot"]["thigh_len"].template As<double>();
-        this->env_config_.SHANK_LEN = cfg["robot"]["shank_lank"].template As<double>();
+        
 
         this->noise_ = cfg["simulation"]["noise"].template As<bool>();
         this->simulation_dt_ = cfg["simulation"]["simulation_dt"].template As<double>();
@@ -38,7 +46,20 @@ namespace raisim
         this->env_config_.N_SCAN_RINGS = cfg["simulation"]["height_scan"]["n_scan_rings"].template As<int>();
         this->env_config_.SCANS_PER_RING = cfg["simulation"]["height_scan"]["scans_per_ring"].template As<int>();
         this->env_config_.FOOT_SCAN_RADIUS = cfg["simulation"]["height_scan"]["foot_scan_radius"].template As<double>();
-        this->orientation_noise_std_ = cfg["simulation"]["orientation_noise_std"].template As<double>() * this->noise_;
+        this->orientation_noise_std_ = cfg["simulation"]["noise_std"]["orientation"].template As<double>() * this->noise_;
+
+        this->observations_noise_["linear_velocity"] = cfg["simulation"]["noise_std"]["linear_velocity"].template As<double>() * this->noise_;
+        this->observations_noise_["angular_velocity"] = cfg["simulation"]["noise_std"]["angular_velocity"].template As<double>() * this->noise_;
+        this->observations_noise_["joint_position"] = cfg["simulation"]["noise_std"]["joint_position"].template As<double>() * this->noise_;
+        this->observations_noise_["joint_velocity"] = cfg["simulation"]["noise_std"]["joint_velocity"].template As<double>() * this->noise_;
+        
+        // print the noise values
+        //RSINFO("Orientation noise: " << this->orientation_noise_std_);
+        //RSINFO("Linear velocity noise: " << this->observations_noise_["linear_velocity"]);
+        //RSINFO("Angular velocity noise: " << this->observations_noise_["angular_velocity"]);
+        //RSINFO("Joint position noise: " << this->observations_noise_["joint_position"]);
+        //RSINFO("Joint velocity noise: " << this->observations_noise_["joint_velocity"]);
+
 
         this->display_target_ = cfg["simulation"]["display"]["target"].template As<bool>();
         this->display_height_ = cfg["simulation"]["display"]["height"].template As<bool>();
@@ -56,6 +77,12 @@ namespace raisim
         int curriculum_grows_start_ = cfg["train"]["curriculum_grows_start"].template As<int>();
         int curriculum_grows_duration_ = cfg["train"]["curriculum_grows_duration"].template As<int>();
 
+        this->traversability_min_speed_treshold_ = cfg["train"]["traversability_min_speed_treshold"].template As<double>();
+
+        this->env_config_.ROBOT_LEG_CONFIG = cfg["robot"]["leg_config"].template As<std::string>();
+
+        //RSINFO("Robot Leg config: " << this->env_config_.ROBOT_LEG_CONFIG);
+
         this->spinning_ = cfg["control"]["spinning"].template As<bool>();
         this->command_mode_ = (command_t)cfg["control"]["command_mode"].template As<int>();
         this->change_facing_ = (command_t)cfg["control"]["change_facing"].template As<bool>();
@@ -67,23 +94,56 @@ namespace raisim
         // Create default terrain
         this->generator_ = WorldGenerator(this->world_.get(), this->anymal_);
         this->hills(0.0, 0.0, 0.0);
-
+        
+        std::string urdf_path = cfg["robot"]["urdf_path"].template As<std::string>();
+        std::string urdf_base_dir = cfg["robot"]["resource_dir"].template As<std::string>();
         // Add robot
         this->anymal_ = this->world_->addArticulatedSystem(
-            resource_dir + "/giadog/mini_ros/urdf/spot.urdf",
-            resource_dir + "/giadog/mini_ros/urdf/",
+            resource_dir + urdf_path,
+            resource_dir + urdf_base_dir,
             {},
             raisim::COLLISION(2), // Collision group
             -1);
+               
         this->anymal_->setName("GiaDoG");
         this->anymal_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
+
+        // Get the initial_configuration into a yaml node variable (for convenience)
+        Yaml::Node initial_configuration = cfg["robot"]["initial_configuration"];
+
+        std::vector<double> lf_leg_init_angles = {
+            initial_configuration["front_left"]["hip"].template As<double>()
+            , initial_configuration["front_left"]["thigh"].template As<double>()
+            , initial_configuration["front_left"]["shank"].template As<double>()
+        };
+
+        std::vector<double> rf_leg_init_angles = {
+            initial_configuration["front_right"]["hip"].template As<double>()
+            , initial_configuration["front_right"]["thigh"].template As<double>()
+            , initial_configuration["front_right"]["shank"].template As<double>()
+        };
+
+        std::vector<double> bl_leg_init_angles = {
+            initial_configuration["back_left"]["hip"].template As<double>()
+            , initial_configuration["back_left"]["thigh"].template As<double>()
+            , initial_configuration["back_left"]["shank"].template As<double>()
+        };
+
+        std::vector<double> br_leg_init_angles = {
+            initial_configuration["back_right"]["hip"].template As<double>()
+            , initial_configuration["back_right"]["thigh"].template As<double>()
+            , initial_configuration["back_right"]["shank"].template As<double>()
+        };
 
         // Initialization
         this->generalized_coord_dim_ = static_cast<unsigned int>(this->anymal_->getGeneralizedCoordinateDim());
         this->generalized_coord_.setZero(this->generalized_coord_dim_);
         this->generalized_coord_init_.setZero(this->generalized_coord_dim_);
-        this->generalized_coord_init_ << 0, 0, 0, 1.0, 0.0, 0.0, 0.0, 0.03,
-            0.4, -0.8, -0.03, 0.4, -0.8, 0.03, 0.4, -0.8, -0.03, 0.4, -0.8;
+        this->generalized_coord_init_ << 0, 0, 0, 1.0, 0.0, 0.0, 0.0, 
+            lf_leg_init_angles[0], lf_leg_init_angles[1], lf_leg_init_angles[2],
+            rf_leg_init_angles[0], rf_leg_init_angles[1], rf_leg_init_angles[2],
+            bl_leg_init_angles[0], bl_leg_init_angles[1], bl_leg_init_angles[2],
+            br_leg_init_angles[0], br_leg_init_angles[1], br_leg_init_angles[2];
 
         std::pair<double, double> curriculum_params = find_begin_and_decay(
             curriculum_grows_start_,
@@ -166,6 +226,8 @@ namespace raisim
             this->foot_indexes_.insert(this->anymal_->getBodyIdx(name));
         }
 
+        //RSINFO("Initializing contact solver");
+
         this->contact_solver_ = ContactSolver(
             this->world_.get(),
             this->anymal_,
@@ -177,6 +239,9 @@ namespace raisim
             shank_names,
             foot_names
             );
+        
+        //RSINFO("Contact solver set up successfully");
+        
 
         this->base_euler_.setZero(3);
         this->FTG_phases_.setZero(4);
@@ -190,19 +255,30 @@ namespace raisim
         this->feet_target_pos_.setZero(12);
         this->feet_target_hist_.setZero(24);
         this->joint_pos_err_hist_.setZero(24);
+
+        //RSINFO("Setting up height scanner");
+
+
+        std::vector<std::string> feet_parent_joints = {
+            cfg["robot"]["foot_parent_joints"]["front_left"].template As<std::string>(),
+            cfg["robot"]["foot_parent_joints"]["front_right"].template As<std::string>(),
+            cfg["robot"]["foot_parent_joints"]["back_left"].template As<std::string>(),
+            cfg["robot"]["foot_parent_joints"]["back_right"].template As<std::string>()
+        };
         this->height_scanner_ = HeightScanner(
             this->world_.get(),
             this->anymal_,
             &this->env_config_,
-            {"front_left_leg_foot",
-             "front_right_leg_foot",
-             "back_left_leg_foot",
-             "back_right_leg_foot"},
-            cfg["simulation"]["heigh_scan"]["render"].template As<bool>());
+            feet_parent_joints,
+            cfg["simulation"]["height_scan"]["render"].template As<bool>());
+        
+        //RSINFO("Height scanner set up successfully");
 
         // visualize if it is the first environment
+        
         if (this->visualizable_)
-        {
+        {   
+            //RSINFO("Setting up visualization components");
             this->server_ = std::make_unique<raisim::RaisimServer>(this->world_.get());
             this->server_->launchServer(port);
             if (this->command_mode_ == command_t::STRAIGHT)
@@ -289,8 +365,9 @@ namespace raisim
                     this->angular_vel_body_->addPoint(Eigen::Vector3d(0, 0, 201));
                 }
             }
-            // 1this->height_scanner_.add_visual_indicators(this->server_.get());
+            this->height_scanner_.add_visual_indicators(this->server_.get());
             this->server_->focusOn(this->anymal_);
+            //RSINFO("Simulation server and visualizers set up successfully.");
         }
 
         // Initiate the random seed
@@ -317,8 +394,11 @@ namespace raisim
 
             this->world_->setTimeStep(dt);
         }
-
+        //RSINFO("Simulation time step set to " << this->world_->getTimeStep() << " s");
+        //RSINFO("Resetting simulation world");
         this->reset(0);
+
+        //RSINFO("Environment initialized");
     }
 
     step_t ENVIRONMENT::reset(int epoch)
@@ -330,14 +410,14 @@ namespace raisim
         // the x = 0, y = 0. This is used to set the initial height of the
         // robot. This is important because the robot is not standing on
         // the ground when it is created.
-        this->generalized_coord_init_[2] = 0.25 + this->get_terrain_height(0, 0);
+        this->generalized_coord_init_[2] = this->env_config_.LEG_SPAN * 1.023 + this->get_terrain_height(0, 0);
         this->anymal_->setState(
             this->generalized_coord_init_,
             this->generalized_vel_init_);
 
         this->elapsed_time_ = 0.0;
         this->elapsed_steps_ = 0;
-        this->traverability_ = 0.0;
+        this->traversability_ = 0.0;
 
         // Re initialize external force applier
         this->external_force_applier_ = ExternalForceApplier(
@@ -435,10 +515,10 @@ namespace raisim
         this->joint_acceleration_ = (joint_vel - joint_vel_prev) / this->control_dt_;
 
         // Traversability calculation
-        int traverability = (this->linear_vel_[0] * this->target_direction_[0] +
-                             this->linear_vel_[1] * this->target_direction_[1]) >= MIN_DESIRED_VEL;
-        this->traverability_ = (this->elapsed_steps_ * this->traverability_ +
-                                traverability) /
+        int traversability = (this->linear_vel_[0] * this->target_direction_[0] +
+                             this->linear_vel_[1] * this->target_direction_[1]) >= this->traversability_min_speed_treshold_;
+        this->traversability_ = (this->elapsed_steps_ * this->traversability_ +
+                                traversability) /
                                (this->elapsed_steps_ + 1);
 
         // Step the time
@@ -543,6 +623,119 @@ namespace raisim
 
     // TEST METHODS
 
+    void ENVIRONMENT::set_foot_positions_and_base_pose(const Eigen::Ref<EigenVec> &foot_pos,
+        double x,
+        double y,
+        double z,
+        double pitch,
+        double yaw,
+        double roll)
+    {
+        Eigen::VectorXd foot_pos_vec = foot_pos.cast<double>();
+
+        Eigen::VectorXd target_joint_angles = Eigen::VectorXd::Zero(12);
+        for (int i = 0; i < 4; i++)
+        {
+        double x = foot_pos_vec(i * 3);
+        double y = foot_pos_vec(i * 3 + 1) ;
+        double z = foot_pos_vec(i * 3 + 2);
+
+
+        Eigen::Vector3d r;
+        if (this->env_config_.USE_HORIZONTAL_FRAME){
+            x += 0;
+            y += this->env_config_.H_OFF * pow(-1, i);
+            z += -this->env_config_.LEG_SPAN * (1 - 0.225); 
+        }
+
+        double roll = this->base_euler_(0);
+        double pitch = this->base_euler_(1);
+
+        r = {
+            x * std::cos(pitch) + y * std::sin(pitch) * std::sin(roll) + z * std::sin(pitch) * std::cos(roll) + 0,
+            0 + y * std::cos(roll) - z * std::sin(roll),
+            -x * std::sin(pitch) + y * std::cos(pitch) * std::sin(roll) + z * std::cos(pitch) * std::cos(roll)};
+        
+        if (!this->env_config_.USE_HORIZONTAL_FRAME){
+            r(1) += this->env_config_.H_OFF * pow(-1, i);
+            r(2) += -this->env_config_.LEG_SPAN * (1 - 0.225); 
+        }
+
+        if ( (i == 2 || i == 3) && this->env_config_.ROBOT_LEG_CONFIG == "><"){
+            r(0) = -r(0);
+        }
+
+        bool right_leg = i == 1 || i == 3;
+  
+        // Asing the joint angles to the joint angle vector.
+        auto leg_joint_angles = solve_leg_IK(right_leg, r, &this->env_config_);
+
+        if ( (i == 2 || i == 3) && this->env_config_.ROBOT_LEG_CONFIG == "><"){
+            target_joint_angles(i * 3)     = leg_joint_angles[0];
+            target_joint_angles(i * 3 + 1) = -leg_joint_angles[1];
+            target_joint_angles(i * 3 + 2) = -leg_joint_angles[2];
+        }
+        else{  
+            target_joint_angles(i * 3)     = leg_joint_angles[0];
+            target_joint_angles(i * 3 + 1) = leg_joint_angles[1];
+            target_joint_angles(i * 3 + 2) = leg_joint_angles[2];
+        }  
+        }
+
+
+        int sim_steps = int(this->control_dt_ / simulation_dt_ + 1e-10);
+        this->pos_target_.tail(this->n_joints_) = target_joint_angles;
+        this->anymal_->setPdTarget(this->pos_target_, this->vel_target_);
+        this->joint_position_ = target_joint_angles;
+        for (int i = 0; i < sim_steps; i++)
+        {
+            if (this->server_)
+                this->server_->lockVisualizationServerMutex();
+            this->set_absolute_position(x, y, z, pitch, yaw, roll);
+            this->world_->integrate();
+            if (this->server_)
+                this->server_->unlockVisualizationServerMutex();
+        }
+        
+
+
+    }
+
+    
+
+    void ENVIRONMENT::set_gait_config(
+            double base_frequency,
+            double leg_1_phase,
+            double leg_2_phase,
+            double leg_3_phase,
+            double leg_4_phase,
+            double foot_vertical_span,
+            double angular_movement_delta,
+            double x_movement_delta,
+            double y_movement_delta,
+            double leg_span,
+            bool use_horizontal_frame
+        ){
+            this->env_config_.BASE_FREQUENCY  = !std::isnan(base_frequency) ? base_frequency : this->env_config_.BASE_FREQUENCY;
+
+            this->env_config_.SIGMA_0[0] = !std::isnan(leg_1_phase) ? leg_1_phase : this->env_config_.SIGMA_0[0];
+            this->env_config_.SIGMA_0[1] = !std::isnan(leg_2_phase) ? leg_2_phase : this->env_config_.SIGMA_0[1];
+            this->env_config_.SIGMA_0[2] = !std::isnan(leg_3_phase) ? leg_3_phase : this->env_config_.SIGMA_0[2];
+            this->env_config_.SIGMA_0[3] = !std::isnan(leg_4_phase) ? leg_4_phase : this->env_config_.SIGMA_0[3];
+
+            this->env_config_.H = !std::isnan(foot_vertical_span) ? foot_vertical_span : this->env_config_.H;
+            
+            this->env_config_.X_MOV_DELTA = !std::isnan(x_movement_delta) ? x_movement_delta : this->env_config_.X_MOV_DELTA;
+            this->env_config_.Y_MOV_DELTA = !std::isnan(y_movement_delta) ? y_movement_delta : this->env_config_.Y_MOV_DELTA;
+            this->env_config_.ANG_MOV_DELTA = !std::isnan(angular_movement_delta) ? angular_movement_delta : this->env_config_.ANG_MOV_DELTA;
+
+            this->env_config_.LEG_SPAN  = !std::isnan(leg_span) ? leg_span : this->env_config_.LEG_SPAN;
+
+            this->env_config_.USE_HORIZONTAL_FRAME = !std::isnan(use_horizontal_frame) ? use_horizontal_frame : this->env_config_.USE_HORIZONTAL_FRAME ;
+            
+
+        }
+
     void ENVIRONMENT::set_absolute_position(
         double x,
         double y,
@@ -574,6 +767,9 @@ namespace raisim
         this->generalized_coord_init_[5] = real_q.y;
         this->generalized_coord_init_[6] = real_q.z;
 
+        // Get the current velocity from raisim
+        this->generalized_coord_init_.tail(12) = this->joint_position_;
+        this->generalized_vel_init_.tail(12) = this->joint_velocity_;
 
         this->anymal_->setState(
             this->generalized_coord_init_,
@@ -959,6 +1155,7 @@ namespace raisim
             euler.y + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_;
         this->height_scanner_.foot_scan(euler.y);
 
+        // Getting body height
         const raisim::RayCollisionList &height_rt = world_->rayTest(
             {generalized_coord_[0], generalized_coord_[1], generalized_coord_[2]},
             {generalized_coord_[0], generalized_coord_[1], generalized_coord_[2] - 50},
@@ -968,6 +1165,7 @@ namespace raisim
             0,
             raisim::RAISIM_STATIC_COLLISION_GROUP);
         this->body_height_ = (generalized_coord_.head(3) - height_rt[0].getPosition()).norm();
+
 
         this->contact_solver_.contact_info();
 
@@ -1017,9 +1215,8 @@ namespace raisim
     }
 
     void ENVIRONMENT::update_info(void)
-    {
-        this->info_["traverability"] = this->traverability_;
-
+    {   
+        this->info_["traversability"] = this->traversability_;
         this->info_["projected_speed"] = this->target_direction_.dot(this->linear_vel_.head(2));
 
         double g = this->world_->getGravity().e().norm();

@@ -1,4 +1,6 @@
 #pragma once
+// import string
+#include <string>
 
 /**
  * @brief Simulation environment configuration parameters
@@ -26,7 +28,7 @@ struct EnvConfig
     // Gait base frequency.
     double BASE_FREQUENCY;
 
-    // Leg span.
+    // Foot movement span.
     double H;
 
     // Horizontal offset of the leg.
@@ -54,4 +56,19 @@ struct EnvConfig
 
     // Time during which the external force will be applied to the robot.
     double EXTERNAL_FORCE_TIME;
+
+    // Robot configuration
+    std::string ROBOT_LEG_CONFIG;
+
+    // Use the horizontal frame of reference for the robot.
+    bool USE_HORIZONTAL_FRAME;
+
+    // x magnitude in the cartesian foot placement heuristic.
+    double X_MOV_DELTA;
+
+    // y magnitude in the cartesian foot placement heuristic.
+    double Y_MOV_DELTA;
+
+    // rot magnitude in the angular foot placement heuristic.
+    double ANG_MOV_DELTA;
 };

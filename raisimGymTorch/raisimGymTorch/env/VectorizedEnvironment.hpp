@@ -522,7 +522,73 @@ namespace raisim
                     angular_y,
                     angular_z);
         }
+
+        /**
+         * @brief Allows to place the robot in a specific position
+         *
+         * @param x Absolute x position
+         * @param y Absolute y position
+         * @param z Absolute z position
+         * @param pitch Pitch angle position
+         * @param yaw Yaw angle position
+         * @param roll Roll angle position
+         *
+         */
+        void set_foot_positions_and_base_pose(
+            Eigen::Ref<EigenVec> &foot_positions,
+            double x,
+            double y,
+            double z,
+            double pitch,
+            double yaw,
+            double roll
+            ){
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
+#pragma omp parallel for schedule(auto)
+#endif
+            for (int i = 0; i < num_envs_; i++){
+                environments_[i]->set_foot_positions_and_base_pose(foot_positions, x, y, z, pitch, yaw, roll);
+            }
+        }
+
+        void set_gait_config(
+            double base_frequency,
+            double leg_1_phase,
+            double leg_2_phase,
+            double leg_3_phase,
+            double leg_4_phase,
+            double foot_vertical_span,
+            double angular_movement_delta,
+            double x_movement_delta,
+            double y_movement_delta,
+            double leg_span,
+            bool use_horizontal_frame
+        ){
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
+#pragma omp parallel for schedule(auto)
+#endif
+            for (int i = 0; i < num_envs_; i++){
+                environments_[i]->set_gait_config(
+                     base_frequency,
+                     leg_1_phase,
+                     leg_2_phase,
+                     leg_3_phase,
+                     leg_4_phase,
+                     foot_vertical_span,
+                     angular_movement_delta,
+                     x_movement_delta,
+                     y_movement_delta,
+                     leg_span,
+                     use_horizontal_frame  
+                    );
+            }
+        }
     };
+
 
     class NormalDistribution
     {
