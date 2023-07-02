@@ -1160,6 +1160,10 @@ namespace raisim
                       .norm();
 
         smoothness_reward = -(tgs_1st + tgs_2nd);
+        if (std::isnan(smoothness_reward))
+        {
+            smoothness_reward = 0.0;
+        }
         this->rewards_.record("targetSmoothness", float(this->curriculum_coeff_ * smoothness_reward));
 
         // -------------------------------------------------------------------//
