@@ -6,6 +6,9 @@
 #pragma once
 
 #include "omp.h"
+#include <chrono>
+#include <thread>
+#include <iostream>
 #include "Yaml.hpp"
 #include "RaisimGymEnv.hpp"
 
@@ -183,6 +186,40 @@ namespace raisim
             this->auto_reset = this->cfg_["control"]["auto_reset"].template As<bool>();
             if (&this->cfg_["simulation"]["render"])
                 this->render_ = this->cfg_["simulation"]["render"].template As<bool>();
+
+            // Print the configuration
+            RSINFO("#---------------------------------------------------------#")
+            RSINFO("\033[1mINITIALIZING VECTORIZED ENVIRONMENT\033[0m");
+            RSINFO("\033[1mConfiguration:\033[0m");
+            RSINFO("  - Resource directory: " << this->resource_dir_);
+            RSINFO("\033[1mSimulation:\033[0m");
+            RSINFO("  - Number of environments: " << this->cfg_["simulation"]["num_envs"].template As<int>());
+            RSINFO("  - Number of threads: " << this->cfg_["simulation"]["num_threads"].template As<int>());
+            RSINFO("  - Normalize: " << (this->normalize_ ? "true" : "false"));
+            RSINFO("  - Render: " << (this->render_ ? "true" : "false"));
+            RSINFO("  - Render port: " << this->port_);
+            RSINFO("  - Noise: " << (this->cfg_["simulation"]["noise"].template As<bool>() ? "true" : "false"));
+            RSINFO("  - Differencial time: " << this->cfg_["simulation"]["simulation_dt"].template As<float>() << "sec");
+            if (this->cfg_["simulation"]["latency"]["variable"].template As<bool>())
+            {
+                float min = this->cfg_["simulation"]["latency"]["min"].template As<float>();
+                float peak = this->cfg_["simulation"]["latency"]["peak"].template As<float>();
+                float max = this->cfg_["simulation"]["latency"]["max"].template As<float>();
+                RSINFO("  - Latency: (" << min << ", " << peak << ", " << max << ") (Variable)");
+            }
+            else
+            {
+                RSINFO("  - Latency: " << this->cfg_["simulation"]["latency"]["peak"].template As<float>() << " (Fixed)");
+            }
+            RSINFO("\033[1mControl:\033[0m");
+            RSINFO("  - Command mode: " << this->cfg_["control"]["command_mode"].template As<std::string>());
+            RSINFO("  - Spinning: " << (this->cfg_["control"]["spinning"].template As<bool>() ? "true" : "false"));
+            RSINFO("  - Change facing: " << (this->cfg_["control"]["change_facing"].template As<bool>() ? "true" : "false"));
+            RSINFO("  - Auto-reset: " << (this->auto_reset ? "true" : "false"));
+            RSINFO("#---------------------------------------------------------#\n")
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+
+            // Initialize the environments
             init();
         }
 
@@ -201,10 +238,8 @@ namespace raisim
             THREAD_COUNT = this->cfg_["simulation"]["num_threads"].template As<int>();
             omp_set_num_threads(THREAD_COUNT);
             this->num_envs_ = this->cfg_["simulation"]["num_envs"].template As<int>();
-            RSINFO("ENVIRONMENTS COUNT: \033[1m" + std::to_string(this->num_envs_) + "\033[0m.");
 
             this->environments_.reserve(this->num_envs_);
-            RSINFO("Creating environments.");
             for (int i = 0; i < this->num_envs_; i++)
             {
                 this->environments_.push_back(new ChildEnvironment(
@@ -217,7 +252,6 @@ namespace raisim
             this->observation_dimensions_ = this->environments_[0]->get_observations_dimension();
             this->action_dim = this->environments_[0]->get_action_dimension();
 
-            RSINFO("Normalize: " + std::to_string(this->normalize_));
             if (this->normalize_)
             {
                 for (const auto &[key, value] : this->observation_dimensions_)
@@ -594,7 +628,7 @@ namespace raisim
                            Eigen::Ref<EigenRowMajorMat> &samples,
                            Eigen::Ref<EigenVec> &log_prob)
         {
-            int agentNumber = int (log_prob.rows());
+            int agentNumber = int(log_prob.rows());
 
 #ifdef _WIN32
 #pragma omp parallel for schedule(static)
@@ -608,7 +642,7 @@ namespace raisim
                 {
                     const float noise = normal_[omp_get_thread_num()].sample();
                     samples(agentId, i) = mean(agentId, i) + noise * std(i);
-                    log_prob(agentId) -= float (noise * noise * 0.5 + std::log(std(i)));
+                    log_prob(agentId) -= float(noise * noise * 0.5 + std::log(std(i)));
                 }
                 log_prob(agentId) -= float(dim_) * 0.9189385332f;
             }

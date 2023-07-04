@@ -38,10 +38,6 @@ namespace raisim
         RSFATAL_IF((*rw).second.IsNone() || (*rw).second["coeff"].IsNone(),
                    "Node " + (*rw).first + " or its coefficient doesn't exist");
         rewards_[(*rw).first].coefficient = (*rw).second["coeff"].template As<float>();
-        RSINFO(
-          "Adding reward \033[1m" + (*rw).first + "\033[0m with coeff: " + 
-          std::to_string(rewards_[(*rw).first].coefficient)
-        );
       }
     }
 
