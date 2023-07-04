@@ -442,9 +442,10 @@ namespace raisim
             double x,
             double y,
             double z,
+            double roll,
             double pitch,
-            double yaw,
-            double roll)
+            double yaw
+            )
         {
 #ifdef _WIN32
 #pragma omp parallel for schedule(static)
@@ -452,7 +453,7 @@ namespace raisim
 #pragma omp parallel for schedule(auto)
 #endif
             for (int i = 0; i < num_envs_; i++)
-                environments_[i]->set_absolute_position(x, y, z, pitch, yaw, roll);
+                environments_[i]->set_absolute_position(x, y, z, roll, pitch, yaw);
         }
 
         /**
@@ -495,9 +496,9 @@ namespace raisim
          * @param x Absolute x position
          * @param y Absolute y position
          * @param z Absolute z position
+         * @param roll Roll angle position
          * @param pitch Pitch angle position
          * @param yaw Yaw angle position
-         * @param roll Roll angle position
          *
          */
         void set_foot_positions_and_base_pose(
@@ -505,9 +506,9 @@ namespace raisim
             double x,
             double y,
             double z,
+            double roll,
             double pitch,
-            double yaw,
-            double roll
+            double yaw
             ){
 #ifdef _WIN32
 #pragma omp parallel for schedule(static)
@@ -515,7 +516,7 @@ namespace raisim
 #pragma omp parallel for schedule(auto)
 #endif
             for (int i = 0; i < num_envs_; i++){
-                environments_[i]->set_foot_positions_and_base_pose(foot_positions, x, y, z, pitch, yaw, roll);
+                environments_[i]->set_foot_positions_and_base_pose(foot_positions, x, y, z, roll, pitch, yaw);
             }
         }
 

@@ -7,11 +7,28 @@
 #include <Eigen/Dense>
 #include "EnvConfig.hpp"
 
+/**
+ * @brief Quaternion struct. The quaternion is expressed in the form
+ *     `w + xi + yj + zk`.
+ * 
+ * @param w Real part of the quaternion.
+ * @param x First imaginary part of the quaternion.
+ * @param y Second imaginary part of the quaternion.
+ * @param z Third imaginary part of the quaternion.
+ * 
+*/
 struct Quaternion
 {
     double w, x, y, z;
 };
 
+/**
+ * @brief Euler angle struct. The angles are expressed in radians.
+ * 
+ * @param roll Rotation around the x axis.
+ * @param pitch Rotation around the y axis.
+ * @param yaw Rotation around the z axis.
+*/
 struct EulerAngles
 {
     double roll, pitch, yaw;
@@ -21,11 +38,32 @@ struct EulerAngles
  * @brief Computes the euler angle representation from the quaternion
  * representation
  *
- * @param q Quaternion representation
+ * @param q Orientation Quaternion (Unit quaternion)
  *
  * @return EulerAngles
  */
 EulerAngles to_euler_angles(Quaternion q);
+
+
+/**
+ * @brief Computes the quaternion representation from the euler angles
+ *
+ * @param q EulerAngles
+ *
+ * @return Quaternion
+ */
+Quaternion to_quaternion(EulerAngles q);
+
+
+/** 
+ * @brief Computes the rotation matrix from the euler angles representation
+ * 
+ * @param euler EulerAngles
+ * 
+ * @return Eigen::Matrix3d
+ */
+
+Eigen::Matrix3d euler_to_rotation_matrix(EulerAngles euler);
 
 /**
  * @brief Function used to apply the control pipeline to the robot. The control

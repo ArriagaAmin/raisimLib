@@ -53,7 +53,8 @@ enum command_t
     STANCE,
     STATIC_SPIN,
     RANDOM,
-    EXTERNAL
+    EXTERNAL,
+    PROBABILITY,
 };
 
 // Possible directions the robot may be facing while moving.
@@ -122,6 +123,14 @@ namespace raisim
         command_t command_mode_;
         // Current command mode
         command_t current_command_mode_;
+        // Probability of chosing a command mode:
+        // We have 4 cases:
+        // Case 1: Move straight facing the target.
+        // Case 2: Move straight facing a random direction.
+        // Case 3: Spin in place.
+        // Case 4: Stand still.
+        double case_1_prob_, case_2_prob_, case_3_prob_, case_4_prob_;
+
         // Indicates if the robot may have to spinning while moving towards
         // its target.
         bool spinning_;
@@ -161,10 +170,14 @@ namespace raisim
         Eigen::VectorXd joint_velocity_;
         // Joint accelerations.
         Eigen::VectorXd joint_acceleration_;
+        
         // Vector parallel to the x component of the rotation matrix of the robot.
         Eigen::Vector3d x_component_vector_;
         // Vector parallel to the y component of the rotation matrix of the robot.
         Eigen::Vector3d y_component_vector_;
+        // Vector parallel to the z component of the rotation matrix of the robot.
+        Eigen::Vector3d z_component_vector_;
+
         // Gravity vector. It is parallel to the z component of the
         // rotation matrix of the robot.
         Eigen::Vector3d gravity_vector_;
@@ -507,18 +520,19 @@ namespace raisim
          * @param x Absolute x position
          * @param y Absolute y position
          * @param z Absolute z position
+         * @param roll Roll angle position
          * @param pitch Pitch angle position
          * @param yaw Yaw angle position
-         * @param roll Roll angle position
          *
          */
         void set_absolute_position(
             double x,
             double y,
             double z,
+            double roll,
             double pitch,
-            double yaw,
-            double roll);
+            double yaw
+            );
 
         /**
          * @brief Allows to set an absolute speed to the robot. Parameters 
@@ -552,9 +566,9 @@ namespace raisim
          * @param x Absolute x position
          * @param y Absolute y position
          * @param z Absolute z position
+         * @param roll Roll angle position
          * @param pitch Pitch angle position
          * @param yaw Yaw angle position
-         * @param roll Roll angle position
          * 
          * 
         */
@@ -563,9 +577,9 @@ namespace raisim
         double x,
         double y,
         double z,
+        double roll,
         double pitch,
-        double yaw,
-        double roll
+        double yaw
         );
 
         /**

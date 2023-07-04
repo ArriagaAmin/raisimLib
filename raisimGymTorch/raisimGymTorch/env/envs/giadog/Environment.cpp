@@ -86,6 +86,19 @@ namespace raisim
         this->spinning_ = cfg["control"]["spinning"].template As<bool>();
         this->command_mode_ = (command_t)cfg["control"]["command_mode"].template As<int>();
         this->change_facing_ = (command_t)cfg["control"]["change_facing"].template As<bool>();
+        
+        this->case_1_prob_ = cfg["control"]["command_mode_probabilities"]["front_facing_straight"].template As<double>();
+        this->case_2_prob_ = cfg["control"]["command_mode_probabilities"]["random_facing_straight"].template As<double>();
+        this->case_3_prob_ = cfg["control"]["command_mode_probabilities"]["static_spin"].template As<double>();
+        this->case_4_prob_ = cfg["control"]["command_mode_probabilities"]["stance"].template As<double>();
+        
+        // Normalize probabilities
+        double sum = this->case_1_prob_ + this->case_2_prob_ + this->case_3_prob_ + this->case_4_prob_;
+        this->case_1_prob_ /= sum;
+        this->case_2_prob_ /= sum;
+        this->case_3_prob_ /= sum;
+        this->case_4_prob_ /= sum;
+
 
         // Create world
         this->world_ = std::make_unique<raisim::World>();
@@ -274,97 +287,95 @@ namespace raisim
         
         //RSINFO("Height scanner set up successfully");
 
-        // visualize if it is the first environment
-        
+        // visualize if it is the first environment   
         if (this->visualizable_)
         {   
             //RSINFO("Setting up visualization components");
             this->server_ = std::make_unique<raisim::RaisimServer>(this->world_.get());
             this->server_->launchServer(port);
-            if (this->command_mode_ == command_t::STRAIGHT)
+            
+            if (this->display_target_)
             {
-                if (this->display_target_)
-                {
-                    this->visual_target_ = this->server_->addVisualCylinder(
-                        "goal", 0.2, 7, 0, 1, 0, 0.5);
-                }
-                if (this->display_direction_)
-                {
-                    this->direction_body_ = this->server_->addVisualPolyLine(
-                        "direction_body");
-                    this->direction_head_ = this->server_->addVisualSphere(
-                        "direction_head", 0.02, 0, 1, 0, 1);
-                    this->direction_body_->setColor(0, 1, 0, 1);
-                    this->direction_body_->addPoint(Eigen::Vector3d(0, 0, 200));
-                    this->direction_body_->addPoint(Eigen::Vector3d(0, 0, 201));
-                }
-                if (this->display_turning_)
-                {
-                    this->turning_body_ = this->server_->addVisualPolyLine(
-                        "turning_body");
-                    this->turning_head_ = this->server_->addVisualSphere(
-                        "turning_head", 0.02, 1, 0, 0, 1);
-                    this->turning_body_->setColor(1, 0, 0, 1);
-                }
-                if (this->display_height_)
-                {
-                    this->height_line_ = this->server_->addVisualPolyLine(
-                        "height_line");
-                    this->height_line_->setColor(1, 1, 1, 1);
-                    this->height_line_->addPoint(Eigen::Vector3d(0, 0, 200));
-                    this->height_line_->addPoint(Eigen::Vector3d(0, 0, 201));
-                }
-                if (this->display_x_component_)
-                {
-                    this->x_component_body_ = this->server_->addVisualPolyLine(
-                        "x_component_body");
-                    this->x_component_head_ = this->server_->addVisualSphere(
-                        "x_component_head", 0.02, 1, 0, 0, 1);
-                    this->x_component_body_->setColor(1, 0, 0, 1);
-                    this->x_component_body_->addPoint(Eigen::Vector3d(0, 0, 200));
-                    this->x_component_body_->addPoint(Eigen::Vector3d(0, 0, 201));
-                }
-                if (this->display_y_component_)
-                {
-                    this->y_component_body_ = this->server_->addVisualPolyLine(
-                        "y_component_body");
-                    this->y_component_head_ = this->server_->addVisualSphere(
-                        "y_component_head", 0.02, 0, 1, 0, 1);
-                    this->y_component_body_->setColor(0, 1, 0, 1);
-                    this->y_component_body_->addPoint(Eigen::Vector3d(0, 0, 200));
-                    this->y_component_body_->addPoint(Eigen::Vector3d(0, 0, 201));
-                }
-                if (this->display_z_component_)
-                {
-                    this->z_component_body_ = this->server_->addVisualPolyLine(
-                        "z_component_body");
-                    this->z_component_head_ = this->server_->addVisualSphere(
-                        "z_component_head", 0.02, 0, 0, 1, 1);
-                    this->z_component_body_->setColor(0, 0, 1, 1);
-                    this->z_component_body_->addPoint(Eigen::Vector3d(0, 0, 200));
-                    this->z_component_body_->addPoint(Eigen::Vector3d(0, 0, 201));
-                }
-                if (this->display_linear_vel_)
-                {
-                    this->linear_vel_body_ = this->server_->addVisualPolyLine(
-                        "linear_vel_body");
-                    this->linear_vel_head_ = this->server_->addVisualSphere(
-                        "linear_vel_head", 0.02, 0, 1, 0, 1);
-                    this->linear_vel_body_->setColor(0, 1, 0, 1);
-                    this->linear_vel_body_->addPoint(Eigen::Vector3d(0, 0, 200));
-                    this->linear_vel_body_->addPoint(Eigen::Vector3d(0, 0, 201));
-                }
-                if (this->display_angular_vel_)
-                {
-                    this->angular_vel_body_ = this->server_->addVisualPolyLine(
-                        "angular_vel_body");
-                    this->angular_vel_head_ = this->server_->addVisualSphere(
-                        "angular_vel_head", 0.02, 1, 0, 0, 1);
-                    this->angular_vel_body_->setColor(1, 0, 0, 1);
-                    this->angular_vel_body_->addPoint(Eigen::Vector3d(0, 0, 200));
-                    this->angular_vel_body_->addPoint(Eigen::Vector3d(0, 0, 201));
-                }
+                this->visual_target_ = this->server_->addVisualCylinder(
+                    "goal", 0.2, 7, 0, 1, 0, 0.5);
             }
+            if (this->display_direction_)
+            {
+                this->direction_body_ = this->server_->addVisualPolyLine(
+                    "direction_body");
+                this->direction_head_ = this->server_->addVisualSphere(
+                    "direction_head", 0.02, 0, 1, 0, 1);
+                this->direction_body_->setColor(0, 1, 0, 1);
+                this->direction_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                this->direction_body_->addPoint(Eigen::Vector3d(0, 0, 201));
+            }
+            if (this->display_turning_)
+            {
+                this->turning_body_ = this->server_->addVisualPolyLine(
+                    "turning_body");
+                this->turning_head_ = this->server_->addVisualSphere(
+                    "turning_head", 0.02, 1, 0, 0, 1);
+                this->turning_body_->setColor(1, 0, 0, 1);
+            }
+            if (this->display_height_)
+            {
+                this->height_line_ = this->server_->addVisualPolyLine(
+                    "height_line");
+                this->height_line_->setColor(1, 1, 1, 1);
+                this->height_line_->addPoint(Eigen::Vector3d(0, 0, 200));
+                this->height_line_->addPoint(Eigen::Vector3d(0, 0, 201));
+            }
+            if (this->display_x_component_)
+            {
+                this->x_component_body_ = this->server_->addVisualPolyLine(
+                    "x_component_body");
+                this->x_component_head_ = this->server_->addVisualSphere(
+                    "x_component_head", 0.02, 1, 0, 0, 1);
+                this->x_component_body_->setColor(1, 0, 0, 1);
+                this->x_component_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                this->x_component_body_->addPoint(Eigen::Vector3d(0, 0, 201));
+            }
+            if (this->display_y_component_)
+            {
+                this->y_component_body_ = this->server_->addVisualPolyLine(
+                    "y_component_body");
+                this->y_component_head_ = this->server_->addVisualSphere(
+                    "y_component_head", 0.02, 0, 1, 0, 1);
+                this->y_component_body_->setColor(0, 1, 0, 1);
+                this->y_component_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                this->y_component_body_->addPoint(Eigen::Vector3d(0, 0, 201));
+            }
+            if (this->display_z_component_)
+            {
+                this->z_component_body_ = this->server_->addVisualPolyLine(
+                    "z_component_body");
+                this->z_component_head_ = this->server_->addVisualSphere(
+                    "z_component_head", 0.02, 0, 0, 1, 1);
+                this->z_component_body_->setColor(0, 0, 1, 1);
+                this->z_component_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                this->z_component_body_->addPoint(Eigen::Vector3d(0, 0, 201));
+            }
+            if (this->display_linear_vel_)
+            {
+                this->linear_vel_body_ = this->server_->addVisualPolyLine(
+                    "linear_vel_body");
+                this->linear_vel_head_ = this->server_->addVisualSphere(
+                    "linear_vel_head", 0.02, 0, 1, 0, 1);
+                this->linear_vel_body_->setColor(0, 1, 0, 1);
+                this->linear_vel_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                this->linear_vel_body_->addPoint(Eigen::Vector3d(0, 0, 201));
+            }
+            if (this->display_angular_vel_)
+            {
+                this->angular_vel_body_ = this->server_->addVisualPolyLine(
+                    "angular_vel_body");
+                this->angular_vel_head_ = this->server_->addVisualSphere(
+                    "angular_vel_head", 0.02, 1, 0, 0, 1);
+                this->angular_vel_body_->setColor(1, 0, 0, 1);
+                this->angular_vel_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                this->angular_vel_body_->addPoint(Eigen::Vector3d(0, 0, 201));
+            }
+            
             this->height_scanner_.add_visual_indicators(this->server_.get());
             this->server_->focusOn(this->anymal_);
             //RSINFO("Simulation server and visualizers set up successfully.");
@@ -578,10 +589,14 @@ namespace raisim
     {
         this->turning_direction_ = turning_direction;
         this->env_config_.CARTESIAN_DELTA = true;
+        this->env_config_.ANGULAR_DELTA = true;
+
+        this->current_command_mode_ == command_t::EXTERNAL;
 
         if (stop)
         {
             this->env_config_.CARTESIAN_DELTA = false;
+            this->env_config_.ANGULAR_DELTA = false;
             this->target_angle_ = 0;
             this->facing_angle_ = 0;
             this->target_position_.setZero(2);
@@ -602,7 +617,21 @@ namespace raisim
 
         raisim::quatToRotMat(quat, rot);
 
-        this->target_position_ = rot.e().block(0, 0, 2, 2).transpose() * this->target_direction_;
+        Eigen::Matrix2d rot_eigen;
+
+        rot_eigen << rot(0, 0), rot(0, 1),rot(1, 0), rot(1, 1);
+
+        Eigen::Vector2d vis_direction;
+
+        vis_direction << std::cos(target_angle_ ), std::sin(target_angle_ );
+
+        vis_direction = rot_eigen * vis_direction;
+
+        // Rotate the direction vector
+        this->target_position_ = {
+            this->generalized_coord_[0] + vis_direction[0],
+            this->generalized_coord_[1] + vis_direction[1]
+            };
     }
 
     std::map<std::string, int> ENVIRONMENT::get_observations_dimension(void)
@@ -627,9 +656,10 @@ namespace raisim
         double x,
         double y,
         double z,
+        double roll,
         double pitch,
-        double yaw,
-        double roll)
+        double yaw
+        )
     {
         Eigen::VectorXd foot_pos_vec = foot_pos.cast<double>();
 
@@ -682,7 +712,6 @@ namespace raisim
         }  
         }
 
-
         int sim_steps = int(this->control_dt_ / simulation_dt_ + 1e-10);
         this->pos_target_.tail(this->n_joints_) = target_joint_angles;
         this->anymal_->setPdTarget(this->pos_target_, this->vel_target_);
@@ -697,8 +726,6 @@ namespace raisim
                 this->server_->unlockVisualizationServerMutex();
         }
         
-
-
     }
 
     
@@ -740,28 +767,31 @@ namespace raisim
         double x,
         double y,
         double z,
+        double roll,
         double pitch,
-        double yaw,
-        double roll)
+        double yaw
+        )
     {
         this->generalized_coord_init_[0] = !std::isnan(x) ? x : this->generalized_coord_[0];
         this->generalized_coord_init_[1] = !std::isnan(y) ? y : this->generalized_coord_[1];
         this->generalized_coord_init_[2] = !std::isnan(z) ? z : this->generalized_coord_[2];
 
-        // We obtain the Euler angles of the current state
-        glm::quat q(
+        Quaternion qt{
             this->generalized_coord_[3],
             this->generalized_coord_[4],
             this->generalized_coord_[5],
             this->generalized_coord_[6]
-        );
-        glm::vec3 euler_angles = glm::eulerAngles(q);
-        double real_pitch = !std::isnan(pitch) ? glm::radians(pitch) : euler_angles.x;
-        double real_yaw = !std::isnan(yaw) ? glm::radians(yaw) : euler_angles.y;
-        double real_roll = !std::isnan(roll) ? glm::radians(roll) : euler_angles.z;
+        };
 
+        EulerAngles euler = to_euler_angles(qt);
+
+        double real_roll = !std::isnan(roll) ? glm::radians(roll) : euler.roll;
+        double real_pitch = !std::isnan(pitch) ? glm::radians(pitch) : euler.pitch;
+        double real_yaw = !std::isnan(yaw) ? glm::radians(yaw) : euler.yaw;
+        
+        EulerAngles real_euler{real_roll, real_pitch, real_yaw};
         // Create the quaternion
-        glm::quat real_q = glm::quat(glm::vec3(real_pitch, real_yaw, real_roll));
+        Quaternion real_q = to_quaternion(real_euler);
         this->generalized_coord_init_[3] = real_q.w;
         this->generalized_coord_init_[4] = real_q.x;
         this->generalized_coord_init_[5] = real_q.y;
@@ -861,16 +891,50 @@ namespace raisim
         {
             this->current_command_mode_ = (command_t)(rand() % 3);
         }
+        else if (this->command_mode_ == command_t::PROBABILITY)
+        {
+            double prob = zero_one_real_dist_(this->merssen_twister_);
+
+            // Case 1: We want the robot to go straight to the target facing it 
+            if (prob < this->case_1_prob_){
+                this->current_command_mode_ = command_t::STRAIGHT;
+                this->facing_angle_ = 0;
+                this->turning_direction_ = 0;
+            }
+            // Case 2: Same as case 1 but with a random facing angle
+            else if (prob < this->case_1_prob_ + this->case_2_prob_)
+            {
+                this->current_command_mode_ = command_t::STRAIGHT;
+                this->facing_angle_ = POSIBLE_FACING_ANGLES[rand() % POSIBLE_FACING_ANGLES.size()];
+                this->turning_direction_ = 0;
+            }
+            // Case 3: Now we want the robot spin standing in place
+            else if (prob < this->case_1_prob_ + this->case_2_prob_ + this->case_3_prob_)
+            {
+                this->current_command_mode_ = command_t::STATIC_SPIN; 
+            }
+            // Case 4: The robot stays in one place
+            else
+            {
+                this->current_command_mode_ = command_t::STANCE; 
+            }
+
+            // print the current command mode
+            std::cout << "Current command mode: " << this->current_command_mode_ << std::endl;
+        }
         else
         {
             this->current_command_mode_ = this->command_mode_;
         }
+        
         double x_size;
         double y_size;
         switch (this->current_command_mode_)
         {
         case command_t::STRAIGHT:
             this->env_config_.CARTESIAN_DELTA = true;
+            this->env_config_.ANGULAR_DELTA = true;
+            
             this->target_angle_ = -M_PI + rand() * (M_PI + M_PI) / RAND_MAX;
             this->target_position_[0] = this->generalized_coord_[0] +
                                         1.5 * std::cos(this->target_angle_);
@@ -916,6 +980,7 @@ namespace raisim
 
         case command_t::STATIC_SPIN:
             this->env_config_.CARTESIAN_DELTA = false;
+            this->env_config_.ANGULAR_DELTA = true;
             this->target_angle_ = 0;
             this->facing_angle_ = 0;
             this->target_position_.setZero(2);
@@ -935,7 +1000,11 @@ namespace raisim
         // If directed_gait_ is true, change the turning_direction_ to reduce
         // the target_angle_ to 0.
         if (this->current_command_mode_ == command_t::STRAIGHT)
-        {
+        {   
+            
+            this->env_config_.CARTESIAN_DELTA = true;
+            this->env_config_.ANGULAR_DELTA = true;
+
             this->target_direction_ = (this->target_position_ - this->generalized_coord_.head(2)).normalized();
             double oldX = this->target_direction_[0];
             double oldY = this->target_direction_[1];
@@ -1072,9 +1141,9 @@ namespace raisim
                     this->generalized_coord_.head(3));
 
                 Eigen::Vector3d direction_head_pos(
-                    this->generalized_coord_[0] + this->gravity_vector_[0],
-                    this->generalized_coord_[1] + this->gravity_vector_[1],
-                    this->generalized_coord_[2] + this->gravity_vector_[2]);
+                    this->generalized_coord_[0] + this->z_component_vector_[0],
+                    this->generalized_coord_[1] + this->z_component_vector_[1],
+                    this->generalized_coord_[2] + this->z_component_vector_[2]);
                 this->z_component_body_->addPoint(direction_head_pos);
                 this->z_component_head_->setPosition(
                     direction_head_pos[0],
@@ -1129,31 +1198,46 @@ namespace raisim
         quat[3] = this->generalized_coord_[6];
 
         raisim::quatToRotMat(quat, rot);
-        this->linear_vel_ = rot.e().transpose() * this->generalized_vel_.segment(0, 3);
+        this->linear_vel_  = rot.e().transpose() * this->generalized_vel_.segment(0, 3);
         this->angular_vel_ = rot.e().transpose() * this->generalized_vel_.segment(3, 3);
 
-        glm::quat q(
-            this->generalized_coord_[3],
-            this->generalized_coord_[4],
-            this->generalized_coord_[5],
-            this->generalized_coord_[6]);
+        Quaternion qt;
 
-        // This way the noise from the orientation is propagated to the
-        // gravity vector
-        glm::mat4 R = glm::toMat3(q);
-        glm::vec3 x_vector = glm::vec3(R[0]);
-        glm::vec3 y_vector = glm::vec3(R[1]);
-        glm::vec3 gravity = glm::vec3(R[2]);
-        this->x_component_vector_ << x_vector.x, x_vector.y, x_vector.z;
-        this->y_component_vector_ << y_vector.x, y_vector.y, y_vector.z;
-        this->gravity_vector_ << -gravity.x, -gravity.y, -gravity.z;
+        qt.w = this->generalized_coord_[3];
+        qt.x = this->generalized_coord_[4];
+        qt.y = this->generalized_coord_[5];
+        qt.z = this->generalized_coord_[6];
 
-        /// Body orientation in euler angles
-        glm::vec3 euler = glm::eulerAngles(q);
-        this->base_euler_ << euler.z + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
-            euler.x + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
-            euler.y + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_;
-        this->height_scanner_.foot_scan(euler.y);
+        EulerAngles euler = to_euler_angles(qt);
+        
+        this->base_euler_ << euler.roll + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
+                             euler.pitch + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
+                             euler.yaw + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_;
+        
+        // // TODO: Apply this
+        // Eigen::Vector3d gv;
+        this->gravity_vector_ << - std::sin(base_euler_[1] ),
+                std::sin(base_euler_[0]) * std::cos(base_euler_[1]),
+                std::cos(base_euler_[0]) * std::cos(base_euler_[1]);
+        
+        
+        // Calculate the rotation matrix with the negative of the euler angles
+        // This is done to get the rotation matrix from the world frame to the body frame
+        // This is done because the gravity vector is defined in the body frame
+        // But for the visualization, we need the gravity vector in the world frame
+        Eigen::Matrix3d new_rot;
+
+        euler.roll = -euler.roll;
+        euler.pitch = -euler.pitch;
+        euler.yaw = -euler.yaw;
+
+        new_rot = euler_to_rotation_matrix(euler);
+
+        this->x_component_vector_ << new_rot.row(0).transpose();
+        this->y_component_vector_ << new_rot.row(1).transpose();
+        this->z_component_vector_ << new_rot.row(2).transpose();
+        
+        this->height_scanner_.foot_scan(euler.yaw);
 
         // Getting body height
         const raisim::RayCollisionList &height_rt = world_->rayTest(
@@ -1395,7 +1479,7 @@ namespace raisim
         bool foot_contact = false;
 
         // Check if the robot is in a position where it might have fallen
-        if (this->gravity_vector_[2] > -0.6)
+        if (this->gravity_vector_[2] < 0.6)
         {
             // Iterate over all contacts of the robot
             for (raisim::Contact &contact : this->anymal_->getContacts())

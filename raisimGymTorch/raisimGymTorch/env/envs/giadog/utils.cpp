@@ -32,6 +32,38 @@ EulerAngles to_euler_angles(Quaternion q)
     return angles;
 }
 
+
+Quaternion to_quaternion(EulerAngles euler){
+    
+    double cr = cos(euler.roll * 0.5);
+    double sr = sin(euler.roll * 0.5);
+
+    double cp = cos(euler.pitch * 0.5);
+    double sp = sin(euler.pitch * 0.5);
+
+    double cy = cos(euler.yaw * 0.5);
+    double sy = sin(euler.yaw * 0.5);
+    
+    Quaternion q;
+
+    q.w = cr * cp * cy + sr * sp * sy;
+    q.x = sr * cp * cy - cr * sp * sy;
+    q.y = cr * sp * cy + sr * cp * sy;
+    q.z = cr * cp * sy - sr * sp * cy;
+
+    return q;
+}
+
+Eigen::Matrix3d euler_to_rotation_matrix(EulerAngles euler){
+    Eigen::Matrix3d rotation_matrix;
+    rotation_matrix = Eigen::AngleAxisd(euler.roll, Eigen::Vector3d::UnitX()) *
+                      Eigen::AngleAxisd(euler.pitch, Eigen::Vector3d::UnitY()) *
+                      Eigen::AngleAxisd(euler.yaw, Eigen::Vector3d::UnitZ());
+    return rotation_matrix;
+}
+
+
+
 /**
  * @brief Position delta for placement heuristics.
  *
@@ -81,7 +113,7 @@ Eigen::MatrixXd direction_deltas(
                             turn_dir *  H;
 
         delta.row(i) += (position_delta * add_cartesian_delta +
-                         rotation_delta * add_cartesian_delta);
+                         rotation_delta * add_angular_delta); 
     }
     return delta;
 }
