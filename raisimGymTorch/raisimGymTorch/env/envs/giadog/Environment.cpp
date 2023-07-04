@@ -283,7 +283,8 @@ namespace raisim
             this->anymal_,
             &this->env_config_,
             feet_parent_joints,
-            cfg["simulation"]["height_scan"]["render"].template As<bool>());
+            cfg["simulation"]["height_scan"]["render"].template As<bool>()
+            && this->visualizable_);
         
         //RSINFO("Height scanner set up successfully");
 
@@ -919,8 +920,7 @@ namespace raisim
                 this->current_command_mode_ = command_t::STANCE; 
             }
 
-            // print the current command mode
-            std::cout << "Current command mode: " << this->current_command_mode_ << std::endl;
+            
         }
         else
         {
