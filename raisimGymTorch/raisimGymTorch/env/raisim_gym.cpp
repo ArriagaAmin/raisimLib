@@ -26,7 +26,7 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m)
         .def_readwrite("done", &step_t::done)
         .def_readwrite("info", &step_t::info);
 
-    // Class that represents the output of a step in the simulation
+    // Class that represents the scaling stats of the environment
     py::class_<statistics_t>(m, "Statistics")
         .def_readwrite("mean", &statistics_t::mean)
         .def_readwrite("var", &statistics_t::var)

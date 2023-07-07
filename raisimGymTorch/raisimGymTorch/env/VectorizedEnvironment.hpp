@@ -70,7 +70,7 @@ namespace raisim
         // Total samples performed
         float count_ = 1e-4f;
 
-        void update_statistics(Eigen::Ref<EigenMapVec> &observations, bool update)
+        void update_statistics(std::vector<step_t>  &steps_info, bool update)
         {
             // Variables used to calculate the mean and variance of
             // each observation
@@ -83,8 +83,10 @@ namespace raisim
                 std::map<std::string, Eigen::VectorXd> sum_squares;
 
                 for (int i = 0; i < this->num_envs_; i++)
-                {
-                    for (const auto &pair : observations(i, 0))
+                {   
+                    // Get the observation from the step.
+                    const std::map<std::string, Eigen::VectorXd> &observation = steps_info[i].observation;
+                    for (const auto &pair : observation)
                     {
                         const std::string &key = pair.first;
                         const Eigen::VectorXd &vec = pair.second;
@@ -102,11 +104,11 @@ namespace raisim
                 }
                 for (auto &pair : recent_mean)
                 {
-                    pair.second /= observations.rows();
+                    pair.second /= this->num_envs_;
                 }
                 for (auto &pair : sum_squares)
                 {
-                    pair.second /= observations.rows();
+                    pair.second /= this->num_envs_;
                 }
 
                 recent_var.clear();
@@ -157,10 +159,12 @@ namespace raisim
 #endif
             // Normalize each vector in each map
             for (int i = 0; i < this->num_envs_; i++)
-            {
-                std::map<std::string, Eigen::VectorXd> &map = observations(i, 0);
-                for (auto &pair : map)
-                {
+            {   
+                
+                // Get the observation from the step.
+                std::map<std::string, Eigen::VectorXd> &observation = steps_info[i].observation;
+                for (auto &pair : observation)
+                {   
                     const std::string &key = pair.first;
                     Eigen::VectorXd &vec = pair.second;
                     const Eigen::VectorXd &mean = mean_[key];
@@ -292,7 +296,7 @@ namespace raisim
          * @param actions Action taken in each environment
          * @return std::vector<step_t>  Information returned in each environment
          */
-        std::vector<step_t> step(Eigen::Ref<EigenRowMajorMat> &actions)
+        std::vector<step_t> step(Eigen::Ref<EigenRowMajorMat> &actions, bool update_scaling_stats)
         {
             std::vector<step_t> result(this->num_envs_);
 
@@ -310,6 +314,9 @@ namespace raisim
                     this->environments_[i]->reset(this->epoch_);
                 }
             }
+            if (this->normalize_)
+                this->update_statistics(result, update_scaling_stats);
+
             return result;
         }
 
@@ -338,11 +345,15 @@ namespace raisim
          *
          * @param stats_data Observation statistics data
          */
-        void set_statistics(statistics_t stats_data)
+        void set_statistics(
+            const std::map<std::string, Eigen::VectorXd> &var,
+            const std::map<std::string, Eigen::VectorXd> &mean,
+            const float count 
+        )
         {
-            this->mean_ = stats_data.mean;
-            this->var_ = stats_data.var;
-            this->count_ = stats_data.count;
+            this->mean_ = mean;
+            this->var_ = var;
+            this->count_ = count;
         }
 
         /**
