@@ -314,9 +314,9 @@ namespace raisim
                     this->environments_[i]->reset(this->epoch_);
                 }
             }
-            if (this->normalize_)
+            if (this->normalize_){
                 this->update_statistics(result, update_scaling_stats);
-
+            }
             return result;
         }
 
@@ -471,6 +471,41 @@ namespace raisim
         {
             return num_envs_;
         }
+
+        /**
+         * @brief Updates the curriculum coefficient
+         *
+         */
+        void update_curriculum_coefficient(void)
+        {
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
+#pragma omp parallel for schedule(auto)
+#endif
+            for (int i = 0; i < num_envs_; i++){
+                environments_[i]->update_curriculum_coefficient();
+            }
+        }
+        
+
+        /**
+         * @brief Changes the current curriculum coefficient
+         *
+         */
+        void set_curriculum_coefficient(double new_coefficient)
+        {
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
+#pragma omp parallel for schedule(auto)
+#endif
+            for (int i = 0; i < num_envs_; i++){
+                environments_[i]->set_curriculum_coefficient(new_coefficient);
+            }
+        }
+        
+
 
         /**
          * @brief Allows to place the robot in a specific position

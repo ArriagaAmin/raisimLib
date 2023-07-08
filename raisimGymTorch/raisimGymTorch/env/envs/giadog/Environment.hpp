@@ -122,7 +122,7 @@ namespace raisim
         // Real command mode
         command_t command_mode_;
         // Current command mode
-        command_t current_command_mode_;
+        command_t current_command_mode_ = command_t::STRAIGHT; // Preventive initialization
         // Probability of chosing a command mode:
         // We have 4 cases:
         // Case 1: Move straight facing the target.
@@ -360,7 +360,7 @@ namespace raisim
          * position.
          *
          */
-        void change_target(void);
+        void change_target(bool preserve_command_mode = false);
 
         /**
          * @brief Updates the target direction, and target direction angle.
@@ -368,6 +368,7 @@ namespace raisim
          * Places the visual target at that position and that specific
          * height.
          *
+         * @param preserve_command If true, the current 
          */
         void update_target(void);
 
@@ -512,6 +513,22 @@ namespace raisim
          * @return int Action space dimension
          */
         int get_action_dimension(void);
+
+
+        /**
+         * @brief Updates the secondary reward coefficient
+         * 
+        */
+        void update_curriculum_coefficient(void);
+
+        /**
+         * @brief Changes the secondary reward coefficient
+         * 
+         * @param value New secondary reward coefficient
+         * 
+        */
+        void set_curriculum_coefficient(double value);
+        
 
         /**
          * @brief Allows to place the robot in a specific position. Parameters 

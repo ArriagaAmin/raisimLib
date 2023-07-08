@@ -269,6 +269,10 @@ namespace raisim
         this->feet_target_hist_.setZero(24);
         this->joint_pos_err_hist_.setZero(24);
 
+        this->observations_["FTG_frequencies"] = this->FTG_frequencies_;
+        this->observations_["joint_position"] = this->joint_position_;
+        this->observations_["joint_velocity"] = this->joint_velocity_;
+        
         //RSINFO("Setting up height scanner");
 
 
@@ -415,8 +419,6 @@ namespace raisim
 
     step_t ENVIRONMENT::reset(int epoch)
     {
-        this->epoch_ = epoch;
-        this->curriculum_coeff_ = pow(this->curriculum_base_, pow(this->curriculum_decay_, this->epoch_));
 
         // We perform a raycast to get the height of the ground around
         // the x = 0, y = 0. This is used to set the initial height of the
@@ -442,6 +444,16 @@ namespace raisim
         this->change_target();
         this->update_observations();
         this->update_info();
+
+        // If any elements from this->FTG_sin_phases_, this->FTG_cos_phases_, this->FTG_frequencies_ are zero, then
+        // this->joint_pos_err_hist_ is nan print the values
+
+        if (!this->FTG_sin_phases_.allFinite()){std::cout<<this->FTG_sin_phases_<<std::endl;};
+        if (!this->FTG_cos_phases_.allFinite()){std::cout<<this->FTG_cos_phases_<<std::endl;};
+        if (!this->FTG_frequencies_.allFinite()){std::cout<<this->FTG_frequencies_<<std::endl;};
+        if (!this->joint_pos_err_hist_.allFinite()){std::cout<<this->joint_pos_err_hist_<<std::endl;};
+
+            
 
         return {this->observations_, this->rewards_.sum(), false, this->info_};
     }
@@ -540,8 +552,8 @@ namespace raisim
         // Check if the robot is in the goal
         if (this->current_command_mode_ == command_t::STRAIGHT &&
             (this->target_position_ - this->generalized_coord_.head(2)).norm() < GOAL_RADIUS)
-        {
-            this->change_target();
+        {   
+            this->change_target(true);
         }
 
         this->update_observations();
@@ -649,6 +661,17 @@ namespace raisim
     int ENVIRONMENT::get_action_dimension(void)
     {
         return 16;
+    }
+
+    void ENVIRONMENT::update_curriculum_coefficient(void){
+        this->epoch_ += 1;
+        this->curriculum_coeff_ = pow(this->curriculum_base_, pow(this->curriculum_decay_, this->epoch_));
+    }
+
+    void ENVIRONMENT::set_curriculum_coefficient(double value){
+        if (value>1){value = 1;};
+        if (value<0){value = 0;};
+        this->curriculum_coeff_ = value;
     }
 
     // TEST METHODS
@@ -876,7 +899,7 @@ namespace raisim
         this->anymal_->setPdGains(joint_p_gain, joint_d_gain);
     }
 
-    void ENVIRONMENT::change_target(void)
+    void ENVIRONMENT::change_target(bool preserve_command_mode)
     {
         if (this->change_facing_)
         {
@@ -888,11 +911,11 @@ namespace raisim
             this->turning_direction_ = this->minus_one_one_dist(this->merssen_twister_);
         }
 
-        if (this->command_mode_ == command_t::RANDOM)
+        if (this->command_mode_ == command_t::RANDOM && !preserve_command_mode)
         {
             this->current_command_mode_ = (command_t)(rand() % 3);
         }
-        else if (this->command_mode_ == command_t::PROBABILITY)
+        else if (this->command_mode_ == command_t::PROBABILITY && !preserve_command_mode)
         {
             double prob = zero_one_real_dist_(this->merssen_twister_);
 
@@ -918,9 +941,10 @@ namespace raisim
             else
             {
                 this->current_command_mode_ = command_t::STANCE; 
-            }
-
-            
+            }   
+        }
+        else if (preserve_command_mode){
+            this->current_command_mode_ = this->current_command_mode_;
         }
         else
         {
@@ -1305,14 +1329,16 @@ namespace raisim
 
         double g = this->world_->getGravity().e().norm();
         double v2 = this->linear_vel_.head(2).squaredNorm();
-        this->info_["froude"] = v2 / (g * this->body_height_);
+        if (this->body_height_ > 0){
+            this->info_["froude"] = v2 / (g * this->body_height_);
+        }
+        else{
+            this->info_["froude"] = 0;
+        }
 
         Eigen::VectorXd torque;
-        torque = -50 * (this->joint_position_ - this->joint_target_) - 0.2 * this->joint_velocity_;
-        torque = torque.cwiseMin(4.0).cwiseMax(-4.0);
-        this->info_["max_torque"] = torque.maxCoeff();
-
         torque = this->anymal_->getGeneralizedForce().e().tail(12);
+        this->info_["max_torque"] = torque.maxCoeff();
         this->info_["power"] = torque.dot(this->joint_velocity_);
     }
 
@@ -1375,15 +1401,16 @@ namespace raisim
 
         // -------------------------------------------------------------------//
         // Base motion reward
+        // Previous version of the reward function (is buggy, might crash!)
         // -------------------------------------------------------------------//
-        double base_motion_reward;
-        h_linear_vel = this->linear_vel_.head(2);
-        ort_vel = (h_linear_vel - this->target_direction_ * proj_linear_vel).norm();
-        h_angular_vel = this->angular_vel_.head(2);
-        w_2 = h_angular_vel.dot(h_angular_vel);
+        // double base_motion_reward;
+        // h_linear_vel = this->linear_vel_.head(2);
+        // ort_vel = (h_linear_vel - this->target_direction_ * proj_linear_vel).norm();
+        // h_angular_vel = this->angular_vel_.head(2);
+        // w_2 = h_angular_vel.dot(h_angular_vel);
 
-        base_motion_reward = std::exp(-1.5 * std::pow(ort_vel, 2)) + std::exp(-1.5 * w_2);
-        rewards_.record("baseMotion", float(base_motion_reward));
+        // base_motion_reward = std::exp(-1.5 * std::pow(ort_vel, 2)) + std::exp(-1.5 * w_2);
+        // rewards_.record("baseMotion", float(base_motion_reward));
 
         // -------------------------------------------------------------------//
         // Body motion Reward:
