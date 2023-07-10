@@ -69,6 +69,21 @@ namespace raisim
         std::map<std::string, Eigen::VectorXd> var_;
         // Total samples performed
         float count_ = 1e-4f;
+        // Number of keys in the observation
+        int n_keys_ = 0;
+        // keys of the observations
+        std::vector<std::string> keys_;
+
+        void get_keys(step_t &step)
+        {
+            for (const auto &pair : step.observation)
+            {
+                this->keys_.push_back(pair.first);
+            }
+
+            this->n_keys_ = this->keys_.size();
+            
+        }
 
         void update_statistics(std::vector<step_t>  &steps_info, bool update)
         {
@@ -84,17 +99,10 @@ namespace raisim
 
                 // We know that all observations in the steps_info info vector have the same sizes and keys
                 // Get a const std::vector<std::string> with the keys of the observations
-                std::vector<std::string> keys;
-                for (const auto &pair : steps_info[0].observation){
-                    keys.push_back(pair.first);
-                }
-#ifdef _WIN32
-#pragma omp parallel for schedule(static)
-#else
-#pragma omp parallel for schedule(auto)
-#endif
-                for (const std::string &key : keys)
+
+                for (int i = 0; i < this->n_keys_; i++)
                 {
+                    const std::string &key = this->keys_[i];
                     // Now we iterate over the observations of each environment
                     for (int i = 0; i < this->num_envs_; i++)
                     {
@@ -117,12 +125,9 @@ namespace raisim
                 }
 
                 // Iterate over the keys a second time to calculate the variance and the delta
-#ifdef _WIN32
-#pragma omp parallel for schedule(static)
-#else
-#pragma omp parallel for schedule(auto)
-#endif
-                for (const std::string &key : keys){
+                for (int i = 0; i < this->n_keys_; i++)
+                {   
+                    const std::string &key = this->keys_[i];
                     int observation_size = steps_info[0].observation[key].size();
                     Eigen::ArrayXd squared_diff_vector(observation_size); // For some reasn this has to be
                     // an array and not a vector :(
@@ -148,13 +153,10 @@ namespace raisim
 
                 float total_count = this->count_ + this->num_envs_;
 
-#ifdef _WIN32
-#pragma omp parallel for schedule(static)
-#else
-#pragma omp parallel for schedule(auto)
-#endif
                 // Finally we iterate one last time over the keys to update the mean and variance
-                for (const std::string &key : keys){
+                for (int i = 0; i < this->n_keys_; i++)
+                {   
+                    const std::string &key = this->keys_[i];
                     this->mean_[key] = this->mean_[key] * (this->count_ / total_count) +
                                        recent_mean[key] * (this->num_envs_ / total_count);
                     this->var_[key] = (this->var_[key] * this->count_ +
@@ -281,6 +283,8 @@ namespace raisim
                     this->var_[key] = Eigen::VectorXd::Zero(value);
                 }
             }
+            step_t step_info = this->environments_[0]->reset(0);
+            get_keys(step_info);
         }
 
         /**
@@ -363,8 +367,8 @@ namespace raisim
          * @param stats_data Observation statistics data
          */
         void set_statistics(
-            const std::map<std::string, Eigen::VectorXd> &var,
             const std::map<std::string, Eigen::VectorXd> &mean,
+            const std::map<std::string, Eigen::VectorXd> &var,
             const float count 
         )
         {

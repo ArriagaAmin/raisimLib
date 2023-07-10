@@ -1296,7 +1296,7 @@ namespace raisim
         this->observations_["base_frequency"][0] = this->env_config_.BASE_FREQUENCY;
         this->observations_["joint_pos_err_hist"] = this->joint_pos_err_hist_;
         this->observations_["joint_vel_hist"] = this->joint_vel_hist_;
-        this->observations_["feet_target_hist"] - this->feet_target_hist_;
+        this->observations_["feet_target_hist"] = this->feet_target_hist_;
         this->observations_["terrain_normal"] = this->contact_solver_.terrain_normal;
         this->observations_["feet_height_scan"] = this->height_scanner_.feet_height_scan;
         this->observations_["foot_contact_forces"] = this->contact_solver_.foot_contact_forces;
