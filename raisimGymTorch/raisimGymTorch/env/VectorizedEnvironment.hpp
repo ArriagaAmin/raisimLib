@@ -72,82 +72,95 @@ namespace raisim
 
         void update_statistics(std::vector<step_t>  &steps_info, bool update)
         {
-            // Variables used to calculate the mean and variance of
-            // each observation
-            std::map<std::string, Eigen::VectorXd> recent_mean, recent_var, delta;
-
             if (update)
-            {
+            {   
+                // Variables used to calculate the mean and variance of
+                // each observation
+                std::map<std::string, Eigen::VectorXd> recent_mean, recent_var, delta;
+                
                 // Calculate the mean and variance per position for each
                 // key in each map
                 std::map<std::string, Eigen::VectorXd> sum_squares;
 
-                for (int i = 0; i < this->num_envs_; i++)
-                {   
-                    // Get the observation from the step.
-                    const std::map<std::string, Eigen::VectorXd> &observation = steps_info[i].observation;
-                    for (const auto &pair : observation)
+                // We know that all observations in the steps_info info vector have the same sizes and keys
+                // Get a const std::vector<std::string> with the keys of the observations
+                std::vector<std::string> keys;
+                for (const auto &pair : steps_info[0].observation){
+                    keys.push_back(pair.first);
+                }
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
+#pragma omp parallel for schedule(auto)
+#endif
+                for (const std::string &key : keys)
+                {
+                    // Now we iterate over the observations of each environment
+                    for (int i = 0; i < this->num_envs_; i++)
                     {
-                        const std::string &key = pair.first;
-                        const Eigen::VectorXd &vec = pair.second;
+                        // Get the observation from the step.
+                        const Eigen::VectorXd &observation_value = steps_info[i].observation[key];
+                        
+                        // If the key is not in the recent_mean map, we add it
                         if (recent_mean.count(key) == 0)
                         {
-                            recent_mean[key] = vec;
-                            sum_squares[key] = vec.array().square().matrix();
+                            recent_mean[key] = observation_value;
                         }
                         else
                         {
-                            recent_mean[key] += vec;
-                            sum_squares[key] += vec.array().square().matrix();
+                            recent_mean[key] += observation_value;
                         }
                     }
-                }
-                for (auto &pair : recent_mean)
-                {
-                    pair.second /= this->num_envs_;
-                }
-                for (auto &pair : sum_squares)
-                {
-                    pair.second /= this->num_envs_;
+
+                    // Now we divide the sum of the observations by the number of environments
+                    recent_mean[key] /= this->num_envs_;
                 }
 
-                recent_var.clear();
-                for (const auto &pair : recent_mean)
-                {
-                    const std::string &key = pair.first;
-                    const Eigen::VectorXd &mean = pair.second;
-                    recent_var[key] = sum_squares[key] - mean.array().square().matrix();
+                // Iterate over the keys a second time to calculate the variance and the delta
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
+#pragma omp parallel for schedule(auto)
+#endif
+                for (const std::string &key : keys){
+                    int observation_size = steps_info[0].observation[key].size();
+                    Eigen::ArrayXd squared_diff_vector(observation_size); // For some reasn this has to be
+                    // an array and not a vector :(
+                    // Allocate the memory for the squared_diff_matrix
+                    squared_diff_vector.setZero();
+                    // Now we iterate over the observations of each environment
+                    for (int i = 0; i < this->num_envs_; i++)
+                    {
+                        // Get the observation from the step.
+                        const Eigen::VectorXd &observation_value = steps_info[i].observation[key];
+                        // Calculate the squared difference between the observation and the mean and
+                        // add it 
+                        squared_diff_vector += (observation_value - recent_mean[key]).array().square();
+                    }
+                    // Colapse the matrix into a vector
+                    delta[key]      =  (this->mean_[key] - recent_mean[key]);
+                    // square the delta element-wise
+                    delta[key] =  delta[key].array().square();
+                    // For the recent_var calculate the 
+                    squared_diff_vector /= this->num_envs_;
+                    recent_var[key] = squared_diff_vector;
                 }
 
-                // Calculate the delta
-                for (const auto &pair : this->mean_)
-                {
-                    const std::string &key = pair.first;
-                    const Eigen::VectorXd &mean = pair.second;
-                    const Eigen::VectorXd &current_recent_mean = recent_mean[key];
-                    delta[key] = (mean - current_recent_mean).array().square().matrix();
-                }
-
-                // Update the cumulative mean and variance
                 float total_count = this->count_ + this->num_envs_;
-                for (auto &pair : this->mean_)
-                {
-                    const std::string &key = pair.first;
-                    Eigen::VectorXd &mean = pair.second;
-                    const Eigen::VectorXd &current_recent_mean = recent_mean[key];
-                    mean = mean * (this->count_ / total_count) +
-                           current_recent_mean * (this->num_envs_ / total_count);
-                }
-                for (auto &pair : this->var_)
-                {
-                    const std::string &key = pair.first;
-                    Eigen::VectorXd &var = pair.second;
-                    const Eigen::VectorXd &current_recent_var = recent_var[key];
-                    const Eigen::VectorXd &current_delta = delta[key];
-                    var = (var * this->count_ +
-                           current_recent_var * this->num_envs_ +
-                           current_delta * (this->count_ * this->num_envs_ / total_count)) /
-                          total_count;
+
+#ifdef _WIN32
+#pragma omp parallel for schedule(static)
+#else
+#pragma omp parallel for schedule(auto)
+#endif
+                // Finally we iterate one last time over the keys to update the mean and variance
+                for (const std::string &key : keys){
+                    this->mean_[key] = this->mean_[key] * (this->count_ / total_count) +
+                                       recent_mean[key] * (this->num_envs_ / total_count);
+                    this->var_[key] = (this->var_[key] * this->count_ +
+                                       recent_var[key] * this->num_envs_ +
+                                       delta[key] * (this->count_ * this->num_envs_ / total_count)) /
+                                      total_count;
                 }
                 this->count_ = total_count;
             }
@@ -167,10 +180,14 @@ namespace raisim
                 {   
                     const std::string &key = pair.first;
                     Eigen::VectorXd &vec = pair.second;
-                    const Eigen::VectorXd &mean = mean_[key];
-                    const Eigen::VectorXd &var = var_[key];
+                    const Eigen::VectorXd &mean = this->mean_[key];
+                    const Eigen::VectorXd &var = this->var_[key];
                     Eigen::VectorXd epsilon = Eigen::VectorXd::Constant(vec.size(), 1e-8);
-                    vec = (vec.array() - mean.array()) / (var.array() + epsilon.array()).sqrt();
+                    // vec = (vec.array() - mean.array()) / (var.array() + epsilon.array()).sqrt();
+                    // Do something like this:  ob.row(i) = (ob.row(i) - obMean_.transpose()).template cwiseQuotient<>((obVar_ + epsilon).cwiseSqrt().transpose());
+                    vec = (vec - mean).template  cwiseQuotient<>((var + epsilon).cwiseSqrt());
+                    // print the normalized observation with its key
+
                 }
             }
         }
