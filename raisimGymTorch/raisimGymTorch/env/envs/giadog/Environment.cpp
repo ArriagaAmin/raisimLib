@@ -1361,9 +1361,6 @@ namespace raisim
         this->observations_["foot_contact_forces"] << this->contact_solver_.foot_contact_forces;
         this->observations_["foot_contact_states"] << this->contact_solver_.foot_contact_states;
         this->observations_["shank_contact_states"] << this->contact_solver_.shank_contact_states;
-        RSINFO(
-            "Foot contact states: " << this->observations_["foot_contact_states"].transpose() << "\n"
-        );
         this->observations_["thigh_contact_states"] << this->contact_solver_.thigh_contact_states;
         this->observations_["foot_ground_fricction"] << this->contact_solver_.foot_ground_friction;
         this->observations_["external_force"] << this->external_force_applier_.external_force_base_frame;
