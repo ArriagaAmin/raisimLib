@@ -20,11 +20,17 @@ int THREAD_COUNT = 1;
 PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m)
 {
     // Class that represents the output of a step in the simulation
-    py::class_<step_t>(m, "Step")
-        .def_readwrite("observation", &step_t::observation)
-        .def_readwrite("reward", &step_t::reward)
-        .def_readwrite("done", &step_t::done)
-        .def_readwrite("info", &step_t::info);
+    py::class_<step_array_info_t>(m, "StepArrayInfo")
+        .def_readwrite("non_privileged_observations", &step_array_info_t::non_privileged_observations)
+        .def_readwrite("privileged_observations", &step_array_info_t::privileged_observations)
+        .def_readwrite("historic_observations", &step_array_info_t::historic_observations)
+        .def_readwrite("dones", &step_array_info_t::dones)
+        .def_readwrite("rewards", &step_array_info_t::rewards)
+        .def_readwrite("traversability", &step_array_info_t::traversability)
+        .def_readwrite("froude", &step_array_info_t::froude)
+        .def_readwrite("projected_speed", &step_array_info_t::projected_speed)
+        .def_readwrite("max_torque", &step_array_info_t::max_torque)
+        .def_readwrite("power", &step_array_info_t::power);
 
     // Class that represents the scaling stats of the environment
     py::class_<statistics_t>(m, "Statistics")
@@ -34,11 +40,15 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m)
 
     py::class_<VectorizedEnvironment<ENVIRONMENT>>(m, RSG_MAKE_STR(ENVIRONMENT_NAME))
         .def(
-            py::init<std::string, std::string, int, bool>(),
+            py::init<std::string, std::string, int, bool, std::vector<std::string>, std::vector<std::string>, std::vector<std::string>>(),
             py::arg("resource_dir"), 
             py::arg("cfg"), 
             py::arg("port"), 
-            py::arg("normalize"))
+            py::arg("normalize"),
+            py::arg("non_privileged_obs"),
+            py::arg("privileged_obs"),
+            py::arg("historic_obs")
+            )
         .def("init", &VectorizedEnvironment<ENVIRONMENT>::init)
         .def("reset", &VectorizedEnvironment<ENVIRONMENT>::reset)
         .def("step", &VectorizedEnvironment<ENVIRONMENT>::step)
@@ -57,6 +67,8 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m)
         .def("set_absolute_velocity", &VectorizedEnvironment<ENVIRONMENT>::set_absolute_velocity)
         .def("set_foot_positions_and_base_pose",  &VectorizedEnvironment<ENVIRONMENT>::set_foot_positions_and_base_pose)
         .def("set_gait_config",  &VectorizedEnvironment<ENVIRONMENT>::set_gait_config)
+        .def("get_obs_sizes", &VectorizedEnvironment<ENVIRONMENT>::get_obs_sizes)
+        .def("get_observations_indexes", &VectorizedEnvironment<ENVIRONMENT>::get_observations_indexes)
         .def(py::pickle(
             [](const VectorizedEnvironment<ENVIRONMENT> &p) { // __getstate__ --> Pickling to Python
                 /* Return a tuple that fully encodes the state of the object */
@@ -73,7 +85,10 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m)
                     t[0].cast<std::string>(),
                     t[1].cast<std::string>(),
                     t[2].cast<int>(),
-                    t[3].cast<int>());
+                    t[3].cast<int>(),
+                    t[4].cast<std::vector<std::string>>(),
+                    t[5].cast<std::vector<std::string>>(),
+                    t[6].cast<std::vector<std::string>>());
 
                 return p;
             }));

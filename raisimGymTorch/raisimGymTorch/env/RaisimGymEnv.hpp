@@ -24,7 +24,7 @@ namespace raisim
     struct step_t
     {
         // Observing the state of the environment after applying the action.
-        std::map<std::string, Eigen::VectorXd> observation;
+        Eigen::VectorXd observation;
         // The reward obtained for applying the action.
         double reward;
         // A boolean value indicating whether or not the episode has ended.
@@ -39,7 +39,7 @@ namespace raisim
         // Environment where the simulation occurs.
         std::unique_ptr<raisim::World> world_;
         // Simulation differential time.
-        double simulation_dt_ = 0.01;
+        double simulation_dt_ = 0.0025;
         // Controlator differential time. It must be greater than the
         // simulation time differential.
         double control_dt_ = 0.01;
@@ -71,6 +71,9 @@ namespace raisim
             std::string resource_dir,
             const Yaml::Node &cfg,
             bool visualizable,
+            std::vector<std::string> non_privileged_obs,
+            std::vector<std::string> privileged_obs,
+            std::vector<std::string> historic_obs,
             int port = 8080) : resource_dir_(std::move(resource_dir)),
                                cfg_(cfg)
         {

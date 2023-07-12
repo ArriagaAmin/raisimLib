@@ -19,8 +19,6 @@ private:
     int scans_per_foot_;
     // Number of legs of the robot.
     int n_legs_;
-    // Total number of scans.
-    int n_scans_;
     // Innermost ring radius.
     double foot_scan_radius_;
 
@@ -54,6 +52,8 @@ private:
         double yaw);
 
 public:
+    // Total number of scans.
+    int n_scans_;
     // Scans of each foot.
     Eigen::VectorXd feet_height_scan;
     // Position of each foot.

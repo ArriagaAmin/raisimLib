@@ -267,6 +267,47 @@ namespace raisim
             {"external_force", Eigen::VectorXd::Zero(3)},
             // PD constants
             {"pd_constants", Eigen::VectorXd::Zero(24)}};
+        
+        Eigen::VectorXd regular_observations_;
+        Eigen::VectorXd privileged_observations_;
+        Eigen::VectorXd historic_observations_;
+        Eigen::VectorXd observations_vector_;
+
+        std::vector<std::string> historic_observations_keys_;
+        std::vector<std::string> regular_observations_keys_;
+        std::vector<std::string> privileged_observations_keys_;
+
+        std::map<std::string, int> observations_sizes_;
+
+        // We must create a list with the default order of the observations
+        std::vector<std::string> defualt_obs_order = {
+                "target_direction",
+                "turning_direction",
+                "body_height",
+                "gravity_vector",
+                "linear_velocity",
+                "angular_velocity",
+                "joint_position",
+                "joint_velocity",
+                "FTG_sin_phases",
+                "FTG_cos_phases",
+                "FTG_frequencies",
+                "base_frequency",
+                "joint_pos_err_hist",
+                "joint_vel_hist",
+                "feet_target_hist",
+                "terrain_normal",
+                "feet_height_scan",
+                "foot_contact_forces",
+                "foot_contact_states",
+                "shank_contact_states",
+                "thigh_contact_states",
+                "foot_ground_fricction",
+                "external_force",
+                "pd_constants"
+        };
+
+       
         // Set of observations of the environment
         std::map<std::string, double> observations_noise_ = {
             {"linear_velocity", 0.07},
@@ -417,6 +458,15 @@ namespace raisim
         bool is_terminal_state(void);
 
     public:
+        // We also need the size of the observations
+        int regular_obs_begin_idx_;
+        int privileged_obs_begin_idx_;
+        int historic_obs_begin_idx_;
+        
+        int regular_obs_size_;
+        int privileged_obs_size_;
+        int historic_obs_size_;
+        int obs_size_;
         /**
          * @param resource_dir Directory where the resources needed to build
          *      the environment are located
@@ -430,6 +480,9 @@ namespace raisim
             const std::string &resource_dir,
             const Yaml::Node &cfg,
             bool visualizable,
+            std::vector<std::string> non_privileged_obs,
+            std::vector<std::string> privileged_obs,
+            std::vector<std::string> historic_obs,
             int port);
 
         /**
@@ -529,6 +582,12 @@ namespace raisim
         */
         void set_curriculum_coefficient(double value);
         
+        /**
+         * @brief Returns a dictionary with the indexes of the observations
+         *        in the observation vector
+        */
+        std::map<std::string, std::array<int, 2>> get_observations_indexes(void);
+
 
         /**
          * @brief Allows to place the robot in a specific position. Parameters 

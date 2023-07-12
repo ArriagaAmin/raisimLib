@@ -6,11 +6,19 @@ namespace raisim
         const std::string &resource_dir,
         const Yaml::Node &cfg,
         bool visualizable,
-        int port) : RaisimGymEnv(resource_dir, cfg, port),
+        std::vector<std::string> non_privileged_obs,
+        std::vector<std::string> privileged_obs,
+        std::vector<std::string> historic_obs,
+        int port) : RaisimGymEnv(resource_dir, cfg,
+                                visualizable, 
+                                non_privileged_obs,
+                                privileged_obs,
+                                historic_obs,
+                                port),
                     visualizable_(visualizable),
                     norm_dist_(0, 1),
                     port_(port)
-    {
+    {  
         // Get config values
         this->env_config_.H = cfg["gait"]["foot_vertical_span"].template As<double>();
         this->env_config_.SIGMA_0[0] = cfg["gait"]["leg_1_phase"].template As<double>();
@@ -53,12 +61,6 @@ namespace raisim
         this->observations_noise_["joint_position"] = cfg["simulation"]["noise_std"]["joint_position"].template As<double>() * this->noise_;
         this->observations_noise_["joint_velocity"] = cfg["simulation"]["noise_std"]["joint_velocity"].template As<double>() * this->noise_;
         
-        // print the noise values
-        //RSINFO("Orientation noise: " << this->orientation_noise_std_);
-        //RSINFO("Linear velocity noise: " << this->observations_noise_["linear_velocity"]);
-        //RSINFO("Angular velocity noise: " << this->observations_noise_["angular_velocity"]);
-        //RSINFO("Joint position noise: " << this->observations_noise_["joint_position"]);
-        //RSINFO("Joint velocity noise: " << this->observations_noise_["joint_velocity"]);
 
 
         this->display_target_ = cfg["simulation"]["display"]["target"].template As<bool>();
@@ -179,6 +181,52 @@ namespace raisim
         this->action_scale_.setZero(this->action_dim_);
         Yaml::Node action_mean = cfg["control"]["action"]["mean"];
         Yaml::Node action_scale = cfg["control"]["action"]["scale"];
+
+        // Iterate over this node cfg["observations"]["privileged_observations"]
+        // And push the keys into the privileged_observations_keys_ vector
+        this->regular_observations_keys_ = non_privileged_obs;
+        this->privileged_observations_keys_ = privileged_obs;
+        this->historic_observations_keys_ =  historic_obs;
+        
+        // if both are empty, then we use all the observations as regular observations
+        if (this->regular_observations_keys_.empty() && this->privileged_observations_keys_.empty())
+        {
+            for (const auto &pair : this->observations_)
+            {
+                this->regular_observations_keys_.push_back(pair.first);
+            }
+        }
+        
+        // Check that all the historic observations are also regular observations
+        for (const std::string &key: this->historic_observations_keys_)
+        {   
+            auto itr = std::find(this->regular_observations_keys_.begin(), this->regular_observations_keys_.end(), key);
+            if (itr == this->regular_observations_keys_.end())
+            {
+                throw std::runtime_error("Historic observation " + key + " is not a regular observation");
+            }
+        }
+        // Check that all the historic observations are consecutive in the regular observations
+        for (int i = 0; i < this->historic_observations_keys_.size() - 1; i++)
+        {
+            auto itr = std::find(this->regular_observations_keys_.begin(), this->regular_observations_keys_.end(), this->historic_observations_keys_[i]);
+            auto itr_next = std::find(this->regular_observations_keys_.begin(), this->regular_observations_keys_.end(), this->historic_observations_keys_[i + 1]);
+            if (itr_next - itr != 1)
+            {
+                throw std::runtime_error("Historic observations are not consecutive in the non priviledge observations");
+            }
+        }
+
+        // Check that all the privileged observations are not in the regular observations
+        for (const std::string &key: this->privileged_observations_keys_)
+        {   
+            auto itr = std::find(this->regular_observations_keys_.begin(), this->regular_observations_keys_.end(), key);
+            if (itr != this->regular_observations_keys_.end())
+            {
+                throw std::runtime_error("Privileged observation " + key + " is also a regular observation");
+            }
+        }
+
         for (int i = 0; i < this->action_dim_ - 4; i++)
         {
             if (i % 3 == 0)
@@ -210,7 +258,6 @@ namespace raisim
             cfg["robot"]["link_names"]["hip_names"]["back_right"].template As<std::string>()
         };
         
-
         std::vector<std::string> thigh_names = {
             cfg["robot"]["link_names"]["thigh_names"]["front_left"].template As<std::string>(),
             cfg["robot"]["link_names"]["thigh_names"]["front_right"].template As<std::string>(),
@@ -240,7 +287,7 @@ namespace raisim
         }
 
         //RSINFO("Initializing contact solver");
-
+        // TODO: Change the friction coefficient to be a parameter
         this->contact_solver_ = ContactSolver(
             this->world_.get(),
             this->anymal_,
@@ -253,9 +300,7 @@ namespace raisim
             foot_names
             );
         
-        //RSINFO("Contact solver set up successfully");
         
-
         this->base_euler_.setZero(3);
         this->FTG_phases_.setZero(4);
         this->FTG_sin_phases_.setZero(4);
@@ -273,8 +318,6 @@ namespace raisim
         this->observations_["joint_position"] = this->joint_position_;
         this->observations_["joint_velocity"] = this->joint_velocity_;
         
-        //RSINFO("Setting up height scanner");
-
 
         std::vector<std::string> feet_parent_joints = {
             cfg["robot"]["foot_parent_joints"]["front_left"].template As<std::string>(),
@@ -290,9 +333,10 @@ namespace raisim
             cfg["simulation"]["height_scan"]["render"].template As<bool>()
             && this->visualizable_);
         
-        //RSINFO("Height scanner set up successfully");
-
-        // visualize if it is the first environment   
+        
+        // Allocate the memory for the feet height scan as it is the only observation
+        // that is not of fixed size at compile time
+        this->observations_["feet_height_scan"] = Eigen::VectorXd::Zero(this->height_scanner_.n_scans_); 
         if (this->visualizable_)
         {   
             //RSINFO("Setting up visualization components");
@@ -410,11 +454,35 @@ namespace raisim
 
             this->world_->setTimeStep(dt);
         }
-        //RSINFO("Simulation time step set to " << this->world_->getTimeStep() << " s");
-        //RSINFO("Resetting simulation world");
+        
+        this->historic_obs_size_ = 0;
+        for (const std::string &key : this->historic_observations_keys_){
+            this->historic_obs_size_ += this->observations_[key].size();
+        }
+
+        // Pre-allocate the memmory for observations vector
+        this->regular_obs_size_ = 0;
+        for (const std::string &key : this->regular_observations_keys_){
+            this->regular_obs_size_ += this->observations_[key].size();
+            this->observations_sizes_[key] = this->observations_[key].size();
+        }
+
+        this->privileged_obs_size_ = 0;
+        for (const std::string &key : this->privileged_observations_keys_){
+           this->privileged_obs_size_ += this->observations_[key].size();
+           this->observations_sizes_[key] = this->observations_[key].size();
+        }
+
+        this->regular_obs_begin_idx_ = 0;
+        this->historic_obs_begin_idx_ = 0;
+        this->privileged_obs_begin_idx_ = this->regular_obs_size_;
+        this->obs_size_ = this->regular_obs_size_ + this->privileged_obs_size_;
+        this->observations_vector_ = Eigen::VectorXd::Zero(this->regular_obs_size_  + this->privileged_obs_size_);
+        
+        
+       
         this->reset(0);
 
-        //RSINFO("Environment initialized");
     }
 
     step_t ENVIRONMENT::reset(int epoch)
@@ -444,18 +512,8 @@ namespace raisim
         this->change_target();
         this->update_observations();
         this->update_info();
-
-        // If any elements from this->FTG_sin_phases_, this->FTG_cos_phases_, this->FTG_frequencies_ are zero, then
-        // this->joint_pos_err_hist_ is nan print the values
-
-        if (!this->FTG_sin_phases_.allFinite()){std::cout<<this->FTG_sin_phases_<<std::endl;};
-        if (!this->FTG_cos_phases_.allFinite()){std::cout<<this->FTG_cos_phases_<<std::endl;};
-        if (!this->FTG_frequencies_.allFinite()){std::cout<<this->FTG_frequencies_<<std::endl;};
-        if (!this->joint_pos_err_hist_.allFinite()){std::cout<<this->joint_pos_err_hist_<<std::endl;};
-
-            
-
-        return {this->observations_, this->rewards_.sum(), false, this->info_};
+        // REset ok
+        return {this->observations_vector_, this->rewards_.sum(), false, this->info_};
     }
 
     step_t ENVIRONMENT::step(const Eigen::Ref<EigenVec> &action)
@@ -465,6 +523,8 @@ namespace raisim
         action_scaled = action_scaled.cwiseProduct(this->action_scale_) +
                         this->action_mean_;
         this->update_target();
+        // Print the action
+        
 
         // Run FTG
         std::tuple<Eigen::VectorXd,
@@ -555,12 +615,12 @@ namespace raisim
         {   
             this->change_target(true);
         }
-
         this->update_observations();
         this->register_rewards();
         this->update_info();
 
-        return {this->observations_, this->rewards_.sum(), this->is_terminal_state(), this->info_};
+
+        return {this->observations_vector_, this->rewards_.sum(), this->is_terminal_state(), this->info_};
     }
 
     void ENVIRONMENT::hills(double frequency, double amplitude, double roughness)
@@ -1238,8 +1298,7 @@ namespace raisim
                              euler.pitch + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
                              euler.yaw + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_;
         
-        // // TODO: Apply this
-        // Eigen::Vector3d gv;
+
         this->gravity_vector_ << - std::sin(base_euler_[1] ),
                 std::sin(base_euler_[0]) * std::cos(base_euler_[1]),
                 std::cos(base_euler_[0]) * std::cos(base_euler_[1]);
@@ -1281,31 +1340,34 @@ namespace raisim
         this->joint_velocity_ = this->generalized_vel_.tail(12);
 
         this->external_force_applier_.external_force_in_base(rot.e());
-
-        this->observations_["target_direction"] = this->target_direction_;
+        
+        this->observations_["target_direction"] << this->target_direction_;
         this->observations_["turning_direction"][0] = this->turning_direction_;
         this->observations_["body_height"][0] = this->body_height_;
-        this->observations_["gravity_vector"] = this->gravity_vector_;
-        this->observations_["linear_velocity"] = this->linear_vel_;
-        this->observations_["angular_velocity"] = this->angular_vel_;
-        this->observations_["joint_position"] = this->joint_position_;
-        this->observations_["joint_velocity"] = this->joint_velocity_;
-        this->observations_["FTG_sin_phases"] = this->FTG_sin_phases_;
-        this->observations_["FTG_cos_phases"] = this->FTG_cos_phases_;
-        this->observations_["FTG_frequencies"] = this->FTG_frequencies_;
+        this->observations_["gravity_vector"] << this->gravity_vector_;
+        this->observations_["linear_velocity"] << this->linear_vel_;
+        this->observations_["angular_velocity"] << this->angular_vel_;
+        this->observations_["joint_position"] << this->joint_position_;
+        this->observations_["joint_velocity"] << this->joint_velocity_;
+        this->observations_["FTG_sin_phases"] << this->FTG_sin_phases_;
+        this->observations_["FTG_cos_phases"] << this->FTG_cos_phases_;
+        this->observations_["FTG_frequencies"] << this->FTG_frequencies_;
         this->observations_["base_frequency"][0] = this->env_config_.BASE_FREQUENCY;
-        this->observations_["joint_pos_err_hist"] = this->joint_pos_err_hist_;
-        this->observations_["joint_vel_hist"] = this->joint_vel_hist_;
-        this->observations_["feet_target_hist"] = this->feet_target_hist_;
-        this->observations_["terrain_normal"] = this->contact_solver_.terrain_normal;
-        this->observations_["feet_height_scan"] = this->height_scanner_.feet_height_scan;
-        this->observations_["foot_contact_forces"] = this->contact_solver_.foot_contact_forces;
-        this->observations_["foot_contact_states"] = this->contact_solver_.foot_contact_states;
-        this->observations_["shank_contact_states"] = this->contact_solver_.shank_contact_states;
-        this->observations_["thigh_contact_states"] = this->contact_solver_.thigh_contact_states;
-        this->observations_["foot_ground_fricction"] = this->contact_solver_.foot_ground_friction;
-        this->observations_["external_force"] = this->external_force_applier_.external_force_base_frame;
-        this->observations_["pd_constants"] = this->pd_constants_;
+        this->observations_["joint_pos_err_hist"] << this->joint_pos_err_hist_;
+        this->observations_["joint_vel_hist"] << this->joint_vel_hist_;
+        this->observations_["feet_target_hist"] << this->feet_target_hist_;
+        this->observations_["terrain_normal"] << this->contact_solver_.terrain_normal;
+        this->observations_["feet_height_scan"] << this->height_scanner_.feet_height_scan;
+        this->observations_["foot_contact_forces"] << this->contact_solver_.foot_contact_forces;
+        this->observations_["foot_contact_states"] << this->contact_solver_.foot_contact_states;
+        this->observations_["shank_contact_states"] << this->contact_solver_.shank_contact_states;
+        RSINFO(
+            "Foot contact states: " << this->observations_["foot_contact_states"].transpose() << "\n"
+        );
+        this->observations_["thigh_contact_states"] << this->contact_solver_.thigh_contact_states;
+        this->observations_["foot_ground_fricction"] << this->contact_solver_.foot_ground_friction;
+        this->observations_["external_force"] << this->external_force_applier_.external_force_base_frame;
+        this->observations_["pd_constants"] << this->pd_constants_;
 
         // Noise addition
         if (this->noise_)
@@ -1320,6 +1382,47 @@ namespace raisim
                 }
             }
         }
+        // Fill the regular observations vector and the privileged observations vector
+        int i = 0;
+        int obs_size;
+        for (const std::string &key : this->regular_observations_keys_){
+            obs_size = this->observations_[key].size();
+            this->observations_vector_.segment(i,  i + obs_size) << this->observations_[key];
+            i += obs_size;
+        }
+        // assert that the privileged observations are at the end of the observations vector (Debugging)
+        assert(i == this->privileged_obs_begin_idx_);
+        i = this->privileged_obs_begin_idx_;
+        for (const std::string &key : this->privileged_observations_keys_){
+            obs_size = this->observations_[key].size();
+            this->observations_vector_.segment(i,  i + obs_size) << this->observations_[key];
+            i += obs_size;
+        }
+    }
+
+    std::map<std::string, std::array<int, 2>> ENVIRONMENT::get_observations_indexes(){
+        std::map<std::string, std::array<int, 2>> indexes;
+        int i = 0;
+        int obs_size;
+        std::array<int, 2> idx;
+        for (const std::string &key : this->regular_observations_keys_){
+            obs_size = this->observations_sizes_[key];
+            idx[0] = i;
+            idx[1] = i + obs_size;
+            indexes[key] = idx;
+            i += obs_size;
+        }
+        // assert that the privileged observations are at the end of the observations vector (Debugging)
+        assert(i == this->privileged_obs_begin_idx_);
+        i = 0;
+        for (const std::string &key : this->privileged_observations_keys_){
+            obs_size = this->observations_sizes_[key];
+            idx[0] = i;
+            idx[1] = i + obs_size;
+            indexes[key] = idx;
+            i += obs_size;
+        }
+        return indexes;
     }
 
     void ENVIRONMENT::update_info(void)

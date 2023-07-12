@@ -23,12 +23,26 @@ namespace raisim
     struct statistics_t
     {
         // Mean of each observation
-        std::map<std::string, Eigen::VectorXd> mean;
+        Eigen::VectorXd mean;
         // Variance of each observation
-        std::map<std::string, Eigen::VectorXd> var;
+        Eigen::VectorXd var;
         // Total samples performed
         float count;
     };
+
+    struct step_array_info_t{
+        Eigen::MatrixXd non_privileged_observations;
+        Eigen::MatrixXd privileged_observations;
+        Eigen::MatrixXd historic_observations;
+        Eigen::VectorXd rewards;
+        Eigen::VectorXd dones;
+        Eigen::VectorXd traversability;
+        Eigen::VectorXd froude;
+        Eigen::VectorXd projected_speed;
+        Eigen::VectorXd max_torque;
+        Eigen::VectorXd power;
+    };
+
 
     template <class ChildEnvironment>
     class VectorizedEnvironment
@@ -63,107 +77,61 @@ namespace raisim
 
         /// Indicates whether the observations should be normalized
         bool normalize_ = true;
-        // Mean of each observation
-        std::map<std::string, Eigen::VectorXd> mean_;
-        // Variance of each observation
-        std::map<std::string, Eigen::VectorXd> var_;
+        
         // Total samples performed
         float count_ = 1e-4f;
-        // Number of keys in the observation
-        int n_keys_ = 0;
-        // keys of the observations
-        std::vector<std::string> keys_;
 
-        void get_keys(step_t &step)
-        {
-            for (const auto &pair : step.observation)
-            {
-                this->keys_.push_back(pair.first);
-            }
+        // We have to get the size of the observation space of each environment
+        // to create the observation vector
+        int regular_obs_begin_idx_;
+        int privileged_obs_begin_idx_;
+        int historic_obs_begin_idx_;
+        
+        int regular_obs_size_;
+        int privileged_obs_size_;
+        int historic_obs_size_;
+        int obs_size_;
+        
 
-            this->n_keys_ = this->keys_.size();
-            
-        }
+        Eigen::VectorXd mean_;
+        Eigen::VectorXd var_;
+        Eigen::VectorXd recent_mean_;
+        Eigen::VectorXd recent_var_;
+        Eigen::VectorXd delta_;
+        Eigen::VectorXd epsilon_;
 
-        void update_statistics(std::vector<step_t>  &steps_info, bool update)
+        Eigen::VectorXd dones_ ;
+        Eigen::VectorXd rewards_ ;
+        Eigen::VectorXd traversability_ ;
+        Eigen::VectorXd froude_ ;
+        Eigen::VectorXd projected_speed_ ;
+        Eigen::VectorXd max_torque_ ;
+        Eigen::VectorXd power_ ;
+
+        Eigen::MatrixXd observations_;
+
+        std::vector<std::string> non_privileged_obs_;
+        std::vector<std::string> privileged_obs_;
+        std::vector<std::string> historic_obs_; 
+
+       
+
+        void update_statistics(Eigen::MatrixXd &observations, bool update)
         {
             if (update)
             {   
-                // Variables used to calculate the mean and variance of
-                // each observation
-                std::map<std::string, Eigen::VectorXd> recent_mean, recent_var, delta;
+                this->recent_mean_ = observations.colwise().mean();
+                this->recent_var_ = (observations.rowwise() - this->recent_mean_.transpose()).colwise().squaredNorm() / this->num_envs_;
+
+                this->delta_ = this->mean_ - this->recent_mean_;
                 
-                // Calculate the mean and variance per position for each
-                // key in each map
-                std::map<std::string, Eigen::VectorXd> sum_squares;
+                for(int i=0; i < this->obs_size_; i++)
+                    this->delta_[i] = this->delta_[i]*this->delta_[i];
 
-                // We know that all observations in the steps_info info vector have the same sizes and keys
-                // Get a const std::vector<std::string> with the keys of the observations
+                float total_count = this->count_ + num_envs_;
 
-                for (int i = 0; i < this->n_keys_; i++)
-                {
-                    const std::string &key = this->keys_[i];
-                    // Now we iterate over the observations of each environment
-                    for (int i = 0; i < this->num_envs_; i++)
-                    {
-                        // Get the observation from the step.
-                        const Eigen::VectorXd &observation_value = steps_info[i].observation[key];
-                        
-                        // If the key is not in the recent_mean map, we add it
-                        if (recent_mean.count(key) == 0)
-                        {
-                            recent_mean[key] = observation_value;
-                        }
-                        else
-                        {
-                            recent_mean[key] += observation_value;
-                        }
-                    }
-
-                    // Now we divide the sum of the observations by the number of environments
-                    recent_mean[key] /= this->num_envs_;
-                }
-
-                // Iterate over the keys a second time to calculate the variance and the delta
-                for (int i = 0; i < this->n_keys_; i++)
-                {   
-                    const std::string &key = this->keys_[i];
-                    int observation_size = steps_info[0].observation[key].size();
-                    Eigen::ArrayXd squared_diff_vector(observation_size); // For some reasn this has to be
-                    // an array and not a vector :(
-                    // Allocate the memory for the squared_diff_matrix
-                    squared_diff_vector.setZero();
-                    // Now we iterate over the observations of each environment
-                    for (int i = 0; i < this->num_envs_; i++)
-                    {
-                        // Get the observation from the step.
-                        const Eigen::VectorXd &observation_value = steps_info[i].observation[key];
-                        // Calculate the squared difference between the observation and the mean and
-                        // add it 
-                        squared_diff_vector += (observation_value - recent_mean[key]).array().square();
-                    }
-                    // Colapse the matrix into a vector
-                    delta[key]      =  (this->mean_[key] - recent_mean[key]);
-                    // square the delta element-wise
-                    delta[key] =  delta[key].array().square();
-                    // For the recent_var calculate the 
-                    squared_diff_vector /= this->num_envs_;
-                    recent_var[key] = squared_diff_vector;
-                }
-
-                float total_count = this->count_ + this->num_envs_;
-
-                // Finally we iterate one last time over the keys to update the mean and variance
-                for (int i = 0; i < this->n_keys_; i++)
-                {   
-                    const std::string &key = this->keys_[i];
-                    this->mean_[key] = this->mean_[key] * (this->count_ / total_count) +
-                                       recent_mean[key] * (this->num_envs_ / total_count);
-                    this->var_[key] = (this->var_[key] * this->count_ +
-                                       recent_var[key] * this->num_envs_ +
-                                       delta[key] * (this->count_ * this->num_envs_ / total_count)) /
-                                      total_count;
-                }
+                this->mean_  = this->mean_ * (this->count_ / total_count) + this->recent_mean_ * (num_envs_ / total_count);
+                this->var_ = (this->var_ * this->count_ + this->recent_var_ * num_envs_ + this->delta_ * (this->count_ * num_envs_ / total_count)) / (total_count);
                 this->count_ = total_count;
             }
 
@@ -175,22 +143,7 @@ namespace raisim
             // Normalize each vector in each map
             for (int i = 0; i < this->num_envs_; i++)
             {   
-                
-                // Get the observation from the step.
-                std::map<std::string, Eigen::VectorXd> &observation = steps_info[i].observation;
-                for (auto &pair : observation)
-                {   
-                    const std::string &key = pair.first;
-                    Eigen::VectorXd &vec = pair.second;
-                    const Eigen::VectorXd &mean = this->mean_[key];
-                    const Eigen::VectorXd &var = this->var_[key];
-                    Eigen::VectorXd epsilon = Eigen::VectorXd::Constant(vec.size(), 1e-8);
-                    // vec = (vec.array() - mean.array()) / (var.array() + epsilon.array()).sqrt();
-                    // Do something like this:  ob.row(i) = (ob.row(i) - obMean_.transpose()).template cwiseQuotient<>((obVar_ + epsilon).cwiseSqrt().transpose());
-                    vec = (vec - mean).template  cwiseQuotient<>((var + epsilon).cwiseSqrt());
-                    // print the normalized observation with its key
-
-                }
+                observations.row(i) = (observations.row(i) - this->mean_.transpose()).template cwiseQuotient<>((this->var_ + this->epsilon_).cwiseSqrt().transpose());
             }
         }
 
@@ -199,10 +152,17 @@ namespace raisim
             std::string resource_dir,
             std::string cfg,
             int port,
-            bool normalize = true) : resource_dir_(resource_dir),
-                                     cfg_string_(cfg),
-                                     normalize_(normalize),
-                                     port_(port)
+            bool normalize,
+            std::vector<std::string> non_privileged_obs,
+            std::vector<std::string> privileged_obs,
+            std::vector<std::string> historic_obs
+            ) : resource_dir_(resource_dir),
+                cfg_string_(cfg),
+                normalize_(normalize),
+                port_(port),
+                non_privileged_obs_(non_privileged_obs),
+                privileged_obs_(privileged_obs),
+                historic_obs_(historic_obs)
         {
             Yaml::Parse(this->cfg_, cfg);
 
@@ -269,22 +229,43 @@ namespace raisim
                     this->resource_dir_,
                     this->cfg_,
                     this->render_ && i == 0,
+                    this->non_privileged_obs_,
+                    this->privileged_obs_,
+                    this->historic_obs_,
                     this->port_));
             }
+
 
             this->observation_dimensions_ = this->environments_[0]->get_observations_dimension();
             this->action_dim = this->environments_[0]->get_action_dimension();
 
-            if (this->normalize_)
-            {
-                for (const auto &[key, value] : this->observation_dimensions_)
-                {
-                    this->mean_[key] = Eigen::VectorXd::Zero(value);
-                    this->var_[key] = Eigen::VectorXd::Zero(value);
-                }
-            }
-            step_t step_info = this->environments_[0]->reset(0);
-            get_keys(step_info);
+            this->regular_obs_begin_idx_ = this->environments_[0]->regular_obs_begin_idx_;
+            this->privileged_obs_begin_idx_= this->environments_[0]->privileged_obs_begin_idx_;
+            this->historic_obs_begin_idx_= this->environments_[0]->historic_obs_begin_idx_;
+            
+            this->regular_obs_size_= this->environments_[0]->regular_obs_size_;
+            this->privileged_obs_size_= this->environments_[0]->privileged_obs_size_;
+            this->historic_obs_size_= this->environments_[0]->historic_obs_size_;
+            this->obs_size_= this->environments_[0]->obs_size_;
+            // Print the observation dimensions
+            
+            this->mean_.setZero(this->obs_size_);
+            this->var_.setZero(this->obs_size_);
+            this->recent_mean_.setZero(this->obs_size_);
+            this->recent_var_.setZero(this->obs_size_);
+            this->delta_.setZero(this->obs_size_);
+            this->epsilon_.setZero(this->obs_size_);
+            this->epsilon_.setConstant(1e-8);
+            // Pre allocate the memory for the observations vector
+            this->dones_.setZero(this->num_envs_);
+            this->rewards_.setZero(this->num_envs_);
+            this->traversability_.setZero(this->num_envs_);
+            this->froude_.setZero(this->num_envs_);
+            this->projected_speed_.setZero(this->num_envs_);
+            this->max_torque_.setZero(this->num_envs_);
+            this->power_.setZero(this->num_envs_);
+            this->observations_.setZero(this->num_envs_, this->obs_size_);     
+               
         }
 
         /**
@@ -293,34 +274,62 @@ namespace raisim
          * @param epoch Current train epoch
          * @return std::vector<step_t>  Information returned in each environment
          */
-        std::vector<step_t> reset(int epoch)
+        step_array_info_t reset(int epoch)
         {
-            std::vector<step_t> result(this->num_envs_);
             this->epoch_ = epoch;
-
 #ifdef _WIN32
 #pragma omp parallel for schedule(static)
 #else
 #pragma omp parallel for schedule(auto)
 #endif
             for (int i = 0; i < this->num_envs_; i++)
-            {
+            {   
                 step_t step_info = this->environments_[i]->reset(this->epoch_);
-                result[i] = step_info;
+                this->observations_.row(i) = step_info.observation;
+                this->dones_(i) = step_info.done;
+                this->rewards_(i) = step_info.reward;
+                this->traversability_(i) = step_info.info["traversability"];
+                this->froude_(i) = step_info.info["froude"];
+                this->projected_speed_(i) = step_info.info["projected_speed"];
+                this->max_torque_(i) = step_info.info["max_torque"];
+                this->power_(i) = step_info.info["power"];
+
+
             }
-            return result;
+            // return the observations segmented by type
+            return {
+                // Non privileged observations
+                this->observations_.block(0, this->regular_obs_begin_idx_, this->num_envs_, this->regular_obs_size_),
+                // Privileged observations
+                this->observations_.block(0, this->privileged_obs_begin_idx_, this->num_envs_, this->privileged_obs_size_),
+                // Historic observations
+                this->observations_.block(0, this->historic_obs_begin_idx_, this->num_envs_, this->historic_obs_size_),
+                // Rewards
+                this->rewards_,
+                // Dones
+                this->dones_,
+                // Traversability
+                this->traversability_,
+                // Froude
+                this->froude_,
+                // Projected speed
+                this->projected_speed_,
+                // Max torque
+                this->max_torque_,
+                // Power
+                this->power_
+            };
+            
         }
 
         /**
          * @brief Perform one step in each simulation
          *
          * @param actions Action taken in each environment
-         * @return std::vector<step_t>  Information returned in each environment
+         * @return step_array_info_t Information returned in each environment
          */
-        std::vector<step_t> step(Eigen::Ref<EigenRowMajorMat> &actions, bool update_scaling_stats)
+        step_array_info_t step(Eigen::Ref<EigenRowMajorMat> &actions, bool update_scaling_stats)
         {
-            std::vector<step_t> result(this->num_envs_);
-
 #ifdef _WIN32
 #pragma omp parallel for schedule(static)
 #else
@@ -329,16 +338,46 @@ namespace raisim
             for (int i = 0; i < this->num_envs_; i++)
             {
                 step_t step_info = this->environments_[i]->step(actions.row(i));
-                result[i] = step_info;
+                this->observations_.row(i) = step_info.observation;
+                this->dones_(i) = step_info.done;
+                this->rewards_(i) = step_info.reward;
+                this->traversability_(i) = step_info.info["traversability"];
+                this->froude_(i) = step_info.info["froude"];
+                this->projected_speed_(i) = step_info.info["projected_speed"];
+                this->max_torque_(i) = step_info.info["max_torque"];
+                this->power_(i) = step_info.info["power"];
+                
                 if (step_info.done && this->auto_reset)
                 {
                     this->environments_[i]->reset(this->epoch_);
                 }
             }
+            
             if (this->normalize_){
-                this->update_statistics(result, update_scaling_stats);
+                this->update_statistics(this->observations_, update_scaling_stats);
             }
-            return result;
+            return {
+                // Non privileged observations
+                this->observations_.block(0, this->regular_obs_begin_idx_, this->num_envs_, this->regular_obs_size_),
+                // Privileged observations
+                this->observations_.block(0, this->privileged_obs_begin_idx_, this->num_envs_, this->privileged_obs_size_),
+                // Historic observations
+                this->observations_.block(0, this->historic_obs_begin_idx_, this->num_envs_, this->historic_obs_size_),
+                // Rewards
+                this->rewards_,
+                // Dones
+                this->dones_,
+                // Traversability
+                this->traversability_,
+                // Froude
+                this->froude_,
+                // Projected speed
+                this->projected_speed_,
+                // Max torque
+                this->max_torque_,
+                // Power
+                this->power_
+            };
         }
 
         /**
@@ -367,8 +406,8 @@ namespace raisim
          * @param stats_data Observation statistics data
          */
         void set_statistics(
-            const std::map<std::string, Eigen::VectorXd> &mean,
-            const std::map<std::string, Eigen::VectorXd> &var,
+            const Eigen::VectorXd &mean,
+            const Eigen::VectorXd &var,
             const float count 
         )
         {
@@ -376,6 +415,17 @@ namespace raisim
             this->var_ = var;
             this->count_ = count;
         }
+
+        /**
+         * Gets the observation sizes
+        */
+       std::vector<int> get_obs_sizes(void) {
+        return {
+            this->regular_obs_size_,
+            this->privileged_obs_size_,
+            this->historic_obs_size_
+        };
+       }
 
         /**
          * @brief Create the terrain that contains hills.
@@ -524,6 +574,10 @@ namespace raisim
             for (int i = 0; i < num_envs_; i++){
                 environments_[i]->set_curriculum_coefficient(new_coefficient);
             }
+        }
+
+        std::map<std::string, std::array<int, 2>> get_observations_indexes(){
+            return this->environments_[0]->get_observations_indexes();
         }
         
 
