@@ -93,13 +93,15 @@ namespace raisim
         this->case_2_prob_ = cfg["control"]["command_mode_probabilities"]["random_facing_straight"].template As<double>();
         this->case_3_prob_ = cfg["control"]["command_mode_probabilities"]["static_spin"].template As<double>();
         this->case_4_prob_ = cfg["control"]["command_mode_probabilities"]["stance"].template As<double>();
+        this->case_5_prob_ = cfg["control"]["command_mode_probabilities"]["fixed_direction"].template As<double>();
         
         // Normalize probabilities
-        double sum = this->case_1_prob_ + this->case_2_prob_ + this->case_3_prob_ + this->case_4_prob_;
+        double sum = this->case_1_prob_ + this->case_2_prob_ + this->case_3_prob_ + this->case_4_prob_ + this->case_5_prob_;
         this->case_1_prob_ /= sum;
         this->case_2_prob_ /= sum;
         this->case_3_prob_ /= sum;
         this->case_4_prob_ /= sum;
+        this->case_5_prob_ /= sum;
 
 
         // Create world
@@ -609,6 +611,13 @@ namespace raisim
         this->elapsed_steps_ += 1;
         this->elapsed_time_ += this->control_dt_;
 
+        // Dessaturate the elapsed time if it is greater than the max time ak.a reset the clock this
+        // is to avoid numerical errors in the FTG
+        if (this->elapsed_time_ > 5.0)
+        {
+            this->elapsed_time_ = 0;
+        }
+
         // Check if the robot is in the goal
         if (this->current_command_mode_ == command_t::STRAIGHT &&
             (this->target_position_ - this->generalized_coord_.head(2)).norm() < GOAL_RADIUS)
@@ -998,10 +1007,15 @@ namespace raisim
                 this->current_command_mode_ = command_t::STATIC_SPIN; 
             }
             // Case 4: The robot stays in one place
-            else
+            else if (prob < this->case_1_prob_ + this->case_2_prob_ + this->case_3_prob_ + this->case_4_prob_)
             {
                 this->current_command_mode_ = command_t::STANCE; 
-            }   
+            }  
+            // Case 5: The robot moves in a fixed direction
+            else
+            {
+                this->current_command_mode_ = command_t::FIXED_DIRECTION; 
+            }
         }
         else if (preserve_command_mode){
             this->current_command_mode_ = this->current_command_mode_;
@@ -1071,6 +1085,12 @@ namespace raisim
             this->target_direction_.setZero(2);
             this->turning_direction_ = this->minus_one_one_dist(this->merssen_twister_);
             break;
+        
+        case command_t::FIXED_DIRECTION:    
+            this->turning_direction_ = 0;
+            this->target_angle_ = -M_PI + rand() * (M_PI + M_PI) / RAND_MAX;
+            break;
+        
 
         default:
             break;

@@ -45,6 +45,7 @@ enum terrain_t
  * STATIC_SPIN indicates that the robot must turn without moving.
  * RANDOM means a random command among the above.
  * EXTERNAL is that the robot is controlled by an external user.
+ * CONSTANT The robot must not spin, just follow a constant cartesain command.
  *
  */
 enum command_t
@@ -55,6 +56,7 @@ enum command_t
     RANDOM,
     EXTERNAL,
     PROBABILITY,
+    FIXED_DIRECTION
 };
 
 // Possible directions the robot may be facing while moving.
@@ -129,7 +131,8 @@ namespace raisim
         // Case 2: Move straight facing a random direction.
         // Case 3: Spin in place.
         // Case 4: Stand still.
-        double case_1_prob_, case_2_prob_, case_3_prob_, case_4_prob_;
+        // Case 5: Move in a fixed direction. (No spin, and the cartesian command is constant)
+        double case_1_prob_, case_2_prob_, case_3_prob_, case_4_prob_, case_5_prob_;
 
         // Indicates if the robot may have to spinning while moving towards
         // its target.
