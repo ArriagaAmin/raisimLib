@@ -114,7 +114,7 @@ void HeightScanner::foot_scan(double base_yaw)
                 raisim::RAISIM_STATIC_COLLISION_GROUP // Collision group
             );
 
-            // Calculate the heaigh scan value as the difference between the
+            // Calculate the heigth scan value as the difference between the
             // ground height and the scan point height
             this->feet_height_scan[i * (this->scans_per_foot_) + j] = (col[0].getPosition()[2] - foot_position_eigen[2]);
 
