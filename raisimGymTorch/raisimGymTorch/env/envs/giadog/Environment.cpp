@@ -648,6 +648,16 @@ namespace raisim
         this->terrain_ = terrain_t::STAIRS;
     }
 
+    void ENVIRONMENT::fast_stairs(const std::vector<double> &height_map, 
+                            double total_length,
+                            double total_width,
+                            int resolution)
+    {
+        this->generator_.clear();
+        this->generator_.fast_stairs(height_map, total_length, total_width, resolution);
+        this->terrain_ = terrain_t::STAIRS;
+    }
+
     void ENVIRONMENT::cellular_steps(double frequency, double amplitude)
     {
         this->generator_.clear();

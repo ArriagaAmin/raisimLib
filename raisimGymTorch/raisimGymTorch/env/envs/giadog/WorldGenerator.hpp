@@ -141,4 +141,12 @@ public:
      * @brief Remove all objects from the terrain
      */
     void clear(void);
+
+    /**
+     * @brief Create the training terrain that contains stairs, by giving the heightmap.
+    */
+    void fast_stairs(const std::vector<double> &heigth_map,
+                    double total_length,
+                    double total_width,
+                    int resolution);
 };

@@ -524,6 +524,17 @@ namespace raisim
          */
         void stairs(double width, double height);
 
+        //** Fast stairs **//
+        /**
+         * @brief Create the training terrain that contains stairs.
+         * This method is faster than the other one.
+         * 
+        */
+        void fast_stairs(const std::vector<double> &heigth_map,
+                    double total_length,
+                    double total_width,
+                    int resolution);
+
         /**
          * @brief Create the training terrain that contains stepped terrain
          *

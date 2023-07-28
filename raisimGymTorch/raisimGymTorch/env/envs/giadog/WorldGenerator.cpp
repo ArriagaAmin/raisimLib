@@ -71,7 +71,7 @@ void WorldGenerator::stairs(
 
     // stair(0, -total_length / 2, 'E', total_width, width, height, n);
     int resolution = 512;
-    this->terrain_x_size = total_width; //total_length;
+    this->terrain_x_size = total_width; 
     this->terrain_y_size = total_length;
 
 
@@ -106,6 +106,22 @@ void WorldGenerator::stairs(
         "ground");
     this->terrain_objects.push(map);
 };
+
+void WorldGenerator::fast_stairs(const std::vector<double> &heigth_map, double total_length, double total_width, int resolution){
+    
+    this->terrain_x_size = total_width; 
+    this->terrain_y_size = total_length;
+    raisim::HeightMap *map = this->world_->addHeightMap(
+        resolution,
+        resolution,
+        this->terrain_x_size,
+        this->terrain_y_size,
+        0.0,
+        0.0,
+        heigth_map,
+        "ground");
+    this->terrain_objects.push(map);
+}
 
 
 

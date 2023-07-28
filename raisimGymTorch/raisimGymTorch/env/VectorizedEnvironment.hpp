@@ -453,13 +453,43 @@ namespace raisim
          */
         void stairs(double widths, double heights)
         {
+            int resolution = 512;
+            double total_width = 6.0; 
+            double total_length = 6.0;
+
+
+            std::vector<double> height_map(resolution * resolution);
+
+            int width_int = std::max(1, (int)(resolution * widths / total_length));
+            double step_height = 0.0;
+
+            for (int i = 0; i < resolution; i++)
+            {
+                for (int j = 0; j < resolution; j++)
+                {
+                    height_map[i * resolution + j] = step_height;
+                }
+
+                // Check if the width is reached
+                if (i % width_int == 0)
+                {
+                    step_height = heights * (i / width_int + 1);
+                }
+
+            }
+            const std::vector<double> &height_map_ref = height_map;
 #ifdef _WIN32
 #pragma omp parallel for schedule(static)
 #else
 #pragma omp parallel for schedule(auto)
 #endif
             for (int i = 0; i < num_envs_; i++)
-                environments_[i]->stairs(widths, heights);
+                environments_[i]->fast_stairs(
+                    height_map_ref,
+                    total_length,
+                    total_width,
+                    resolution
+                );
         }
 
         /**
