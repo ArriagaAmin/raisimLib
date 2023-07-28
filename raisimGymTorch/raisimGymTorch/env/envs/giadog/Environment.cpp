@@ -1038,7 +1038,7 @@ namespace raisim
                                         1.5 * std::cos(this->target_angle_);
             if (this->terrain_ == terrain_t::STAIRS)
             {
-                this->target_position_[1] = rand() % 100 > 50 ? 10.0 : -10.0;
+                this->target_position_[1] = rand() % 100 > 50 ? 6.0 : -6.0;
             }
             else
             {

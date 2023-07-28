@@ -61,16 +61,54 @@ void WorldGenerator::stairs(
     double total_length,
     double total_width)
 {
-    int n = int(total_length / width);
+    // int n = int(total_length / width);
 
-    raisim::Ground *ground = this->world_->addGround();
+    // raisim::Ground *ground = this->world_->addGround();
 
-    this->terrain_objects.push(ground);
-    this->terrain_x_size = total_length;
-    this->terrain_y_size = total_width;
+    // this->terrain_objects.push(ground);
+    // this->terrain_x_size = total_length;
+    // this->terrain_y_size = total_width;
 
-    stair(0, -total_length / 2, 'E', total_width, width, height, n);
+    // stair(0, -total_length / 2, 'E', total_width, width, height, n);
+    int resolution = 512;
+    this->terrain_x_size = total_width; //total_length;
+    this->terrain_y_size = total_length;
+
+
+    std::vector<double> height_map(resolution * resolution);
+
+    int width_int = std::max(1, (int)(resolution * width / this->terrain_y_size));
+    double step_height = 0.0;
+
+    for (int i = 0; i < resolution; i++)
+    {
+        for (int j = 0; j < resolution; j++)
+        {
+            height_map[i * resolution + j] = step_height;
+        }
+
+        // Check if the width is reached
+        if (i % width_int == 0)
+        {
+            step_height = height * (i / width_int + 1);
+        }
+
+    }
+
+    raisim::HeightMap *map = this->world_->addHeightMap(
+        resolution,
+        resolution,
+        this->terrain_x_size,
+        this->terrain_y_size,
+        0.0,
+        0.0,
+        height_map,
+        "ground");
+    this->terrain_objects.push(map);
 };
+
+
+
 
 void WorldGenerator::hills(
     double frequency,
@@ -142,6 +180,8 @@ void WorldGenerator::cellular_steps(
         "ground");
     this->terrain_objects.push(map);
 }
+
+
 
 void WorldGenerator::steps(
     double width,

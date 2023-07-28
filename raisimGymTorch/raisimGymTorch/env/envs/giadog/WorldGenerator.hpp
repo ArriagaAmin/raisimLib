@@ -92,8 +92,8 @@ public:
     void stairs(
         double width,
         double height,
-        double total_length = 15.0,
-        double total_width = 7.5);
+        double total_length = 6.0,
+        double total_width = 6.0);
 
     /**
      * @brief Create the training terrain that contains stepped terrain.
