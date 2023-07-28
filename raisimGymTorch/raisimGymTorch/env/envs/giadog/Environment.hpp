@@ -203,6 +203,9 @@ namespace raisim
         // Minimun desired speed of the robot to consider it is fluently on the terrain
         double traversability_min_speed_treshold_ = 0.066; // We set a default value of 0.066 m/s
 
+        // Terminal state
+        bool terminal_state_ = false;
+
         // Ability of the robot to transit the current terrain
         double traversability_;
         // Height of the robot body;
@@ -494,7 +497,7 @@ namespace raisim
          * @param epoch Current train epoch
          * @return step_t Current environment information
          */
-        step_t reset(int epoch) final;
+        step_t reset() final;
 
         /**
          * @brief Steps the simulation.

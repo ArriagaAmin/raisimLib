@@ -88,10 +88,9 @@ namespace raisim
         /**
          * @brief Resets the simulation to the initial state.
          *
-         * @param epoch Current train epoch
          * @return step_t Current environment information
          */
-        virtual step_t reset(int epoch) = 0;
+        virtual step_t reset() = 0;
 
         /**
          * @brief Perform a time step within the simulation.

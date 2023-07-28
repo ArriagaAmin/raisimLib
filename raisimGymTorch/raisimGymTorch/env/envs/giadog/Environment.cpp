@@ -483,13 +483,12 @@ namespace raisim
         
         
        
-        this->reset(0);
+        this->reset();
 
     }
 
-    step_t ENVIRONMENT::reset(int epoch)
+    step_t ENVIRONMENT::reset()
     {
-
         // We perform a raycast to get the height of the ground around
         // the x = 0, y = 0. This is used to set the initial height of the
         // robot. This is important because the robot is not standing on
@@ -513,9 +512,11 @@ namespace raisim
         this->set_pd_gains();
         this->change_target();
         this->update_observations();
+        this->terminal_state_ = false;
         this->update_info();
+        
         // REset ok
-        return {this->observations_vector_, this->rewards_.sum(), false, this->info_};
+        return {this->observations_vector_, this->rewards_.sum(), this->terminal_state_, this->info_};
     }
 
     step_t ENVIRONMENT::step(const Eigen::Ref<EigenVec> &action)
@@ -625,11 +626,12 @@ namespace raisim
             this->change_target(true);
         }
         this->update_observations();
+        this->terminal_state_ = this->is_terminal_state();
         this->register_rewards();
         this->update_info();
 
 
-        return {this->observations_vector_, this->rewards_.sum(), this->is_terminal_state(), this->info_};
+        return {this->observations_vector_, this->rewards_.sum(), this->terminal_state_, this->info_};
     }
 
     void ENVIRONMENT::hills(double frequency, double amplitude, double roughness)
@@ -1615,12 +1617,26 @@ namespace raisim
             this->contact_solver_.foot_contact_states));
         this->rewards_.record("slip", float(this->curriculum_coeff_ * slip_reward));
 
+        // --------------------------------------------------------------------//
+        // Joint Constraint Reward:
+        //
+        // Penalizes the violation of joint limits.
+        // If the joints move far from the initial position, the agent is
+        // penalized. (For the moment this reward is not used)
+        // --------------------------------------------------------------------//
+        // double joint_constraint_reward;
+        // Eigen::VectorXd joint_pos_init_ = this->generalized_coord_init_.segment(6, 18);
+        // joint_constraint_reward = (this->joint_position_ - joint_pos_init_).squaredNorm();
+
+        // this->rewards_.record("jointConstraint", float(this->curriculum_coeff_ * joint_constraint_reward));
+
+
         // -------------------------------------------------------------------//
         // Terminal Reward:
         //
         // Heavily penalizes the robot if it falls over.
         // -------------------------------------------------------------------//
-        this->rewards_.record("terminal", float(-10 * this->is_terminal_state()));
+        this->rewards_.record("terminal", float(-10 * this->terminal_state_));
     }
 
     bool ENVIRONMENT::is_terminal_state(void)

@@ -274,9 +274,8 @@ namespace raisim
          * @param epoch Current train epoch
          * @return std::vector<step_t>  Information returned in each environment
          */
-        step_array_info_t reset(int epoch)
+        step_array_info_t reset()
         {
-            this->epoch_ = epoch;
 #ifdef _WIN32
 #pragma omp parallel for schedule(static)
 #else
@@ -284,7 +283,7 @@ namespace raisim
 #endif
             for (int i = 0; i < this->num_envs_; i++)
             {   
-                step_t step_info = this->environments_[i]->reset(this->epoch_);
+                step_t step_info = this->environments_[i]->reset();
                 this->observations_.row(i) = step_info.observation;
                 this->dones_(i) = step_info.done;
                 this->rewards_(i) = step_info.reward;
@@ -349,7 +348,7 @@ namespace raisim
                 
                 if (step_info.done && this->auto_reset)
                 {
-                    this->environments_[i]->reset(this->epoch_);
+                    this->environments_[i]->reset();
                 }
             }
             
