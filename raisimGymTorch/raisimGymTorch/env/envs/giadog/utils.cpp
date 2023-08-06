@@ -243,7 +243,7 @@ std::pair<double, double> inverse_kinematic_params(
  * @param y hip-to-foot distance in y-axis
  * @param z hip-to-foot distance in z-axis
  * @param D Leg domain
- * @param r_o Radius of the leg
+ * @param r_o Parameter of the leg's outer radius.
  * @param config Simulation environment configuration parameters.
  *
  * @return Joint Angles required for desired position.
