@@ -294,7 +294,7 @@ namespace raisim
             this->world_.get(),
             this->anymal_,
             this->world_->getTimeStep(),
-            1.0, // Fricction coefficient mean
+            0.7,// Fricction coefficient mean
             0.2, // Fricction coefficient std
             hip_names,
             thigh_names,
