@@ -133,6 +133,8 @@ namespace raisim
         // Case 4: Stand still.
         // Case 5: Move in a fixed direction. (No spin, and the cartesian command is constant)
         double case_1_prob_, case_2_prob_, case_3_prob_, case_4_prob_, case_5_prob_;
+        // Command duration
+        double command_duration_ = 3.0; // 3 seconds
 
         // Indicates if the robot may have to spinning while moving towards
         // its target.
@@ -141,7 +143,7 @@ namespace raisim
         // moving towards its target.
         bool change_facing_;
         // Turning direction: 1 for clockwise, -1 for counter-clockwise
-        // and to not rotate.
+        // and to not rotate 0.
         int turning_direction_ = 0;
         // Angle the robot should be looking at while moving.
         double facing_angle_ = 0.0;

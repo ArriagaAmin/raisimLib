@@ -10,42 +10,40 @@ namespace raisim
         std::vector<std::string> privileged_obs,
         std::vector<std::string> historic_obs,
         int port) : RaisimGymEnv(resource_dir, cfg,
-                                visualizable, 
-                                non_privileged_obs,
-                                privileged_obs,
-                                historic_obs,
-                                port),
+                                 visualizable,
+                                 non_privileged_obs,
+                                 privileged_obs,
+                                 historic_obs,
+                                 port),
                     visualizable_(visualizable),
                     norm_dist_(0, 1),
                     port_(port)
-    {  
+    {
         // Get config values
         this->env_config_.H = cfg["gait"]["foot_vertical_span"].template As<double>();
         this->env_config_.SIGMA_0[0] = cfg["gait"]["leg_1_phase"].template As<double>();
         this->env_config_.SIGMA_0[1] = cfg["gait"]["leg_2_phase"].template As<double>();
         this->env_config_.SIGMA_0[2] = cfg["gait"]["leg_3_phase"].template As<double>();
         this->env_config_.SIGMA_0[3] = cfg["gait"]["leg_4_phase"].template As<double>();
-        this->env_config_.ANGULAR_DELTA   = cfg["gait"]["angular_movement_heuristic"].template As<bool>();
-        this->env_config_.BASE_FREQUENCY  = cfg["gait"]["base_frequency"].template As<double>();
+        this->env_config_.ANGULAR_DELTA = cfg["gait"]["angular_movement_heuristic"].template As<bool>();
+        this->env_config_.BASE_FREQUENCY = cfg["gait"]["base_frequency"].template As<double>();
         this->env_config_.CARTESIAN_DELTA = cfg["gait"]["cartesian_movement_heuristic"].template As<bool>();
         this->env_config_.USE_HORIZONTAL_FRAME = cfg["gait"]["use_horizontal_frame"].template As<bool>();
-        
+
         this->env_config_.X_MOV_DELTA = cfg["gait"]["x_movement_delta"].template As<double>();
         this->env_config_.Y_MOV_DELTA = cfg["gait"]["y_movement_delta"].template As<double>();
         this->env_config_.ANG_MOV_DELTA = cfg["gait"]["angular_movement_delta"].template As<double>();
 
-        this->env_config_.H_OFF     = cfg["robot"]["h_off"].template As<double>();
-        this->env_config_.V_OFF     = cfg["robot"]["v_off"].template As<double>();
-        this->env_config_.LEG_SPAN  = cfg["robot"]["leg_span"].template As<double>();
+        this->env_config_.H_OFF = cfg["robot"]["h_off"].template As<double>();
+        this->env_config_.V_OFF = cfg["robot"]["v_off"].template As<double>();
+        this->env_config_.LEG_SPAN = cfg["robot"]["leg_span"].template As<double>();
         this->env_config_.THIGH_LEN = cfg["robot"]["thigh_len"].template As<double>();
         this->env_config_.SHANK_LEN = cfg["robot"]["shank_len"].template As<double>();
-        
-        
+
         this->p_max_ = cfg["robot"]["pd_gains"]["kp_max"].template As<double>();
         this->p_min_ = cfg["robot"]["pd_gains"]["kp_min"].template As<double>();
         this->d_max_ = cfg["robot"]["pd_gains"]["kd_max"].template As<double>();
         this->d_min_ = cfg["robot"]["pd_gains"]["kd_min"].template As<double>();
-        
 
         this->noise_ = cfg["simulation"]["noise"].template As<bool>();
         this->simulation_dt_ = cfg["simulation"]["simulation_dt"].template As<double>();
@@ -60,8 +58,6 @@ namespace raisim
         this->observations_noise_["angular_velocity"] = cfg["simulation"]["noise_std"]["angular_velocity"].template As<double>() * this->noise_;
         this->observations_noise_["joint_position"] = cfg["simulation"]["noise_std"]["joint_position"].template As<double>() * this->noise_;
         this->observations_noise_["joint_velocity"] = cfg["simulation"]["noise_std"]["joint_velocity"].template As<double>() * this->noise_;
-        
-
 
         this->display_target_ = cfg["simulation"]["display"]["target"].template As<bool>();
         this->display_height_ = cfg["simulation"]["display"]["height"].template As<bool>();
@@ -83,18 +79,18 @@ namespace raisim
 
         this->env_config_.ROBOT_LEG_CONFIG = cfg["robot"]["leg_config"].template As<std::string>();
 
-        //RSINFO("Robot Leg config: " << this->env_config_.ROBOT_LEG_CONFIG);
+        // RSINFO("Robot Leg config: " << this->env_config_.ROBOT_LEG_CONFIG);
 
         this->spinning_ = cfg["control"]["spinning"].template As<bool>();
         this->command_mode_ = (command_t)cfg["control"]["command_mode"].template As<int>();
         this->change_facing_ = (command_t)cfg["control"]["change_facing"].template As<bool>();
-        
+
         this->case_1_prob_ = cfg["control"]["command_mode_probabilities"]["front_facing_straight"].template As<double>();
         this->case_2_prob_ = cfg["control"]["command_mode_probabilities"]["random_facing_straight"].template As<double>();
         this->case_3_prob_ = cfg["control"]["command_mode_probabilities"]["static_spin"].template As<double>();
         this->case_4_prob_ = cfg["control"]["command_mode_probabilities"]["stance"].template As<double>();
         this->case_5_prob_ = cfg["control"]["command_mode_probabilities"]["fixed_direction"].template As<double>();
-        
+
         // Normalize probabilities
         double sum = this->case_1_prob_ + this->case_2_prob_ + this->case_3_prob_ + this->case_4_prob_ + this->case_5_prob_;
         this->case_1_prob_ /= sum;
@@ -103,7 +99,6 @@ namespace raisim
         this->case_4_prob_ /= sum;
         this->case_5_prob_ /= sum;
 
-
         // Create world
         this->world_ = std::make_unique<raisim::World>();
         this->rewards_.initializeFromConfigurationFile(cfg["train"]["reward"]["details"]);
@@ -111,7 +106,7 @@ namespace raisim
         // Create default terrain
         this->generator_ = WorldGenerator(this->world_.get(), this->anymal_);
         this->hills(0.0, 0.0, 0.0);
-        
+
         std::string urdf_path = cfg["robot"]["urdf_path"].template As<std::string>();
         std::string urdf_base_dir = cfg["robot"]["resource_dir"].template As<std::string>();
         // Add robot
@@ -121,7 +116,7 @@ namespace raisim
             {},
             raisim::COLLISION(2), // Collision group
             -1);
-               
+
         this->anymal_->setName("GiaDoG");
         this->anymal_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
@@ -129,34 +124,22 @@ namespace raisim
         Yaml::Node initial_configuration = cfg["robot"]["initial_configuration"];
 
         std::vector<double> lf_leg_init_angles = {
-            initial_configuration["front_left"]["hip"].template As<double>()
-            , initial_configuration["front_left"]["thigh"].template As<double>()
-            , initial_configuration["front_left"]["shank"].template As<double>()
-        };
+            initial_configuration["front_left"]["hip"].template As<double>(), initial_configuration["front_left"]["thigh"].template As<double>(), initial_configuration["front_left"]["shank"].template As<double>()};
 
         std::vector<double> rf_leg_init_angles = {
-            initial_configuration["front_right"]["hip"].template As<double>()
-            , initial_configuration["front_right"]["thigh"].template As<double>()
-            , initial_configuration["front_right"]["shank"].template As<double>()
-        };
+            initial_configuration["front_right"]["hip"].template As<double>(), initial_configuration["front_right"]["thigh"].template As<double>(), initial_configuration["front_right"]["shank"].template As<double>()};
 
         std::vector<double> bl_leg_init_angles = {
-            initial_configuration["back_left"]["hip"].template As<double>()
-            , initial_configuration["back_left"]["thigh"].template As<double>()
-            , initial_configuration["back_left"]["shank"].template As<double>()
-        };
+            initial_configuration["back_left"]["hip"].template As<double>(), initial_configuration["back_left"]["thigh"].template As<double>(), initial_configuration["back_left"]["shank"].template As<double>()};
 
         std::vector<double> br_leg_init_angles = {
-            initial_configuration["back_right"]["hip"].template As<double>()
-            , initial_configuration["back_right"]["thigh"].template As<double>()
-            , initial_configuration["back_right"]["shank"].template As<double>()
-        };
+            initial_configuration["back_right"]["hip"].template As<double>(), initial_configuration["back_right"]["thigh"].template As<double>(), initial_configuration["back_right"]["shank"].template As<double>()};
 
         // Initialization
         this->generalized_coord_dim_ = static_cast<unsigned int>(this->anymal_->getGeneralizedCoordinateDim());
         this->generalized_coord_.setZero(this->generalized_coord_dim_);
         this->generalized_coord_init_.setZero(this->generalized_coord_dim_);
-        this->generalized_coord_init_ << 0, 0, 0, 1.0, 0.0, 0.0, 0.0, 
+        this->generalized_coord_init_ << 0, 0, 0, 1.0, 0.0, 0.0, 0.0,
             lf_leg_init_angles[0], lf_leg_init_angles[1], lf_leg_init_angles[2],
             rf_leg_init_angles[0], rf_leg_init_angles[1], rf_leg_init_angles[2],
             bl_leg_init_angles[0], bl_leg_init_angles[1], bl_leg_init_angles[2],
@@ -188,8 +171,8 @@ namespace raisim
         // And push the keys into the privileged_observations_keys_ vector
         this->regular_observations_keys_ = non_privileged_obs;
         this->privileged_observations_keys_ = privileged_obs;
-        this->historic_observations_keys_ =  historic_obs;
-        
+        this->historic_observations_keys_ = historic_obs;
+
         // if both are empty, then we use all the observations as regular observations
         if (this->regular_observations_keys_.empty() && this->privileged_observations_keys_.empty())
         {
@@ -198,10 +181,10 @@ namespace raisim
                 this->regular_observations_keys_.push_back(pair.first);
             }
         }
-        
+
         // Check that all the historic observations are also regular observations
-        for (const std::string &key: this->historic_observations_keys_)
-        {   
+        for (const std::string &key : this->historic_observations_keys_)
+        {
             auto itr = std::find(this->regular_observations_keys_.begin(), this->regular_observations_keys_.end(), key);
             if (itr == this->regular_observations_keys_.end())
             {
@@ -220,8 +203,8 @@ namespace raisim
         }
 
         // Check that all the privileged observations are not in the regular observations
-        for (const std::string &key: this->privileged_observations_keys_)
-        {   
+        for (const std::string &key : this->privileged_observations_keys_)
+        {
             auto itr = std::find(this->regular_observations_keys_.begin(), this->regular_observations_keys_.end(), key);
             if (itr != this->regular_observations_keys_.end())
             {
@@ -257,9 +240,8 @@ namespace raisim
             cfg["robot"]["link_names"]["hip_names"]["front_left"].template As<std::string>(),
             cfg["robot"]["link_names"]["hip_names"]["front_right"].template As<std::string>(),
             cfg["robot"]["link_names"]["hip_names"]["back_left"].template As<std::string>(),
-            cfg["robot"]["link_names"]["hip_names"]["back_right"].template As<std::string>()
-        };
-        
+            cfg["robot"]["link_names"]["hip_names"]["back_right"].template As<std::string>()};
+
         std::vector<std::string> thigh_names = {
             cfg["robot"]["link_names"]["thigh_names"]["front_left"].template As<std::string>(),
             cfg["robot"]["link_names"]["thigh_names"]["front_right"].template As<std::string>(),
@@ -272,37 +254,33 @@ namespace raisim
             cfg["robot"]["link_names"]["shank_names"]["front_left"].template As<std::string>(),
             cfg["robot"]["link_names"]["shank_names"]["front_right"].template As<std::string>(),
             cfg["robot"]["link_names"]["shank_names"]["back_left"].template As<std::string>(),
-            cfg["robot"]["link_names"]["shank_names"]["back_right"].template As<std::string>()
-        };
+            cfg["robot"]["link_names"]["shank_names"]["back_right"].template As<std::string>()};
 
         std::vector<std::string> foot_names = {
             cfg["robot"]["link_names"]["foot_names"]["front_left"].template As<std::string>(),
             cfg["robot"]["link_names"]["foot_names"]["front_right"].template As<std::string>(),
             cfg["robot"]["link_names"]["foot_names"]["back_left"].template As<std::string>(),
-            cfg["robot"]["link_names"]["foot_names"]["back_right"].template As<std::string>()
-        };
-    
+            cfg["robot"]["link_names"]["foot_names"]["back_right"].template As<std::string>()};
+
         // Indices of the feet
         for (std::string name : shank_names)
         {
             this->foot_indexes_.insert(this->anymal_->getBodyIdx(name));
         }
 
-        //RSINFO("Initializing contact solver");
-        // TODO: Change the friction coefficient to be a parameter
+        // RSINFO("Initializing contact solver");
+        //  TODO: Change the friction coefficient to be a parameter
         this->contact_solver_ = ContactSolver(
             this->world_.get(),
             this->anymal_,
             this->world_->getTimeStep(),
-            0.7,// Fricction coefficient mean
+            0.7, // Fricction coefficient mean
             0.2, // Fricction coefficient std
             hip_names,
             thigh_names,
             shank_names,
-            foot_names
-            );
-        
-        
+            foot_names);
+
         this->base_euler_.setZero(3);
         this->FTG_phases_.setZero(4);
         this->FTG_sin_phases_.setZero(4);
@@ -319,32 +297,28 @@ namespace raisim
         this->observations_["FTG_frequencies"] = this->FTG_frequencies_;
         this->observations_["joint_position"] = this->joint_position_;
         this->observations_["joint_velocity"] = this->joint_velocity_;
-        
 
         std::vector<std::string> feet_parent_joints = {
             cfg["robot"]["foot_parent_joints"]["front_left"].template As<std::string>(),
             cfg["robot"]["foot_parent_joints"]["front_right"].template As<std::string>(),
             cfg["robot"]["foot_parent_joints"]["back_left"].template As<std::string>(),
-            cfg["robot"]["foot_parent_joints"]["back_right"].template As<std::string>()
-        };
+            cfg["robot"]["foot_parent_joints"]["back_right"].template As<std::string>()};
         this->height_scanner_ = HeightScanner(
             this->world_.get(),
             this->anymal_,
             &this->env_config_,
             feet_parent_joints,
-            cfg["simulation"]["height_scan"]["render"].template As<bool>()
-            && this->visualizable_);
-        
-        
+            cfg["simulation"]["height_scan"]["render"].template As<bool>() && this->visualizable_);
+
         // Allocate the memory for the feet height scan as it is the only observation
         // that is not of fixed size at compile time
-        this->observations_["feet_height_scan"] = Eigen::VectorXd::Zero(this->height_scanner_.n_scans_); 
+        this->observations_["feet_height_scan"] = Eigen::VectorXd::Zero(this->height_scanner_.n_scans_);
         if (this->visualizable_)
-        {   
-            //RSINFO("Setting up visualization components");
+        {
+            // RSINFO("Setting up visualization components");
             this->server_ = std::make_unique<raisim::RaisimServer>(this->world_.get());
             this->server_->launchServer(port);
-            
+
             if (this->display_target_)
             {
                 this->visual_target_ = this->server_->addVisualCylinder(
@@ -426,14 +400,14 @@ namespace raisim
                 this->angular_vel_body_->addPoint(Eigen::Vector3d(0, 0, 200));
                 this->angular_vel_body_->addPoint(Eigen::Vector3d(0, 0, 201));
             }
-            
+
             this->height_scanner_.add_visual_indicators(this->server_.get());
             this->server_->focusOn(this->anymal_);
-            //RSINFO("Simulation server and visualizers set up successfully.");
+            // RSINFO("Simulation server and visualizers set up successfully.");
         }
 
         // Initiate the random seed
-        srand(uint32_t (time(0)));
+        srand(uint32_t(time(0)));
 
         this->latency_ = cfg["simulation"]["latency"]["peak"].template As<double>();
         this->env_config_.CONTROL_DT = 1 / this->latency_;
@@ -456,35 +430,35 @@ namespace raisim
 
             this->world_->setTimeStep(dt);
         }
-        
+
         this->historic_obs_size_ = 0;
-        for (const std::string &key : this->historic_observations_keys_){
+        for (const std::string &key : this->historic_observations_keys_)
+        {
             this->historic_obs_size_ += this->observations_[key].size();
         }
 
         // Pre-allocate the memmory for observations vector
         this->regular_obs_size_ = 0;
-        for (const std::string &key : this->regular_observations_keys_){
+        for (const std::string &key : this->regular_observations_keys_)
+        {
             this->regular_obs_size_ += this->observations_[key].size();
             this->observations_sizes_[key] = this->observations_[key].size();
         }
 
         this->privileged_obs_size_ = 0;
-        for (const std::string &key : this->privileged_observations_keys_){
-           this->privileged_obs_size_ += this->observations_[key].size();
-           this->observations_sizes_[key] = this->observations_[key].size();
+        for (const std::string &key : this->privileged_observations_keys_)
+        {
+            this->privileged_obs_size_ += this->observations_[key].size();
+            this->observations_sizes_[key] = this->observations_[key].size();
         }
 
         this->regular_obs_begin_idx_ = 0;
         this->historic_obs_begin_idx_ = 0;
         this->privileged_obs_begin_idx_ = this->regular_obs_size_;
         this->obs_size_ = this->regular_obs_size_ + this->privileged_obs_size_;
-        this->observations_vector_ = Eigen::VectorXd::Zero(this->regular_obs_size_  + this->privileged_obs_size_);
-        
-        
-       
-        this->reset();
+        this->observations_vector_ = Eigen::VectorXd::Zero(this->regular_obs_size_ + this->privileged_obs_size_);
 
+        this->reset();
     }
 
     step_t ENVIRONMENT::reset()
@@ -499,6 +473,7 @@ namespace raisim
             this->generalized_vel_init_);
 
         this->elapsed_time_ = 0.0;
+        this->command_duration_ = 3.0;
         this->elapsed_steps_ = 0;
         this->traversability_ = 0.0;
 
@@ -514,7 +489,7 @@ namespace raisim
         this->update_observations();
         this->terminal_state_ = false;
         this->update_info();
-        
+
         // REset ok
         return {this->observations_vector_, this->rewards_.sum(), this->terminal_state_, this->info_};
     }
@@ -527,7 +502,6 @@ namespace raisim
                         this->action_mean_;
         this->update_target();
         // Print the action
-        
 
         // Run FTG
         std::tuple<Eigen::VectorXd,
@@ -603,10 +577,10 @@ namespace raisim
 
         // Traversability calculation
         int traversability = (this->linear_vel_[0] * this->target_direction_[0] +
-                             this->linear_vel_[1] * this->target_direction_[1]) >= this->traversability_min_speed_treshold_;
+                              this->linear_vel_[1] * this->target_direction_[1]) >= this->traversability_min_speed_treshold_;
         this->traversability_ = (this->elapsed_steps_ * this->traversability_ +
-                                traversability) /
-                               (this->elapsed_steps_ + 1);
+                                 traversability) /
+                                (this->elapsed_steps_ + 1);
 
         // Step the time
         this->elapsed_steps_ += 1;
@@ -622,14 +596,20 @@ namespace raisim
         // Check if the robot is in the goal
         if (this->current_command_mode_ == command_t::STRAIGHT &&
             (this->target_position_ - this->generalized_coord_.head(2)).norm() < GOAL_RADIUS)
-        {   
+        {
             this->change_target(true);
         }
+        // Change the target if the elapsed time is greater than 3 seconds
+        if (this->elapsed_time_ > this->command_duration_)
+        {
+            this->command_duration_ += 3.0;
+            this->change_target();
+        }
+
         this->update_observations();
         this->terminal_state_ = this->is_terminal_state();
         this->register_rewards();
         this->update_info();
-
 
         return {this->observations_vector_, this->rewards_.sum(), this->terminal_state_, this->info_};
     }
@@ -648,10 +628,10 @@ namespace raisim
         this->terrain_ = terrain_t::STAIRS;
     }
 
-    void ENVIRONMENT::fast_stairs(const std::vector<double> &height_map, 
-                            double total_length,
-                            double total_width,
-                            int resolution)
+    void ENVIRONMENT::fast_stairs(const std::vector<double> &height_map,
+                                  double total_length,
+                                  double total_width,
+                                  int resolution)
     {
         this->generator_.clear();
         this->generator_.fast_stairs(height_map, total_length, total_width, resolution);
@@ -713,19 +693,18 @@ namespace raisim
 
         Eigen::Matrix2d rot_eigen;
 
-        rot_eigen << rot(0, 0), rot(0, 1),rot(1, 0), rot(1, 1);
+        rot_eigen << rot(0, 0), rot(0, 1), rot(1, 0), rot(1, 1);
 
         Eigen::Vector2d vis_direction;
 
-        vis_direction << std::cos(target_angle_ ), std::sin(target_angle_ );
+        vis_direction << std::cos(target_angle_), std::sin(target_angle_);
 
         vis_direction = rot_eigen * vis_direction;
 
         // Rotate the direction vector
         this->target_position_ = {
             this->generalized_coord_[0] + vis_direction[0],
-            this->generalized_coord_[1] + vis_direction[1]
-            };
+            this->generalized_coord_[1] + vis_direction[1]};
     }
 
     std::map<std::string, int> ENVIRONMENT::get_observations_dimension(void)
@@ -733,7 +712,7 @@ namespace raisim
         std::map<std::string, int> dimensions;
         for (const std::pair<const std::string, Eigen::VectorXd> &pair : this->observations_)
         {
-            dimensions[pair.first] = int (pair.second.size());
+            dimensions[pair.first] = int(pair.second.size());
         }
 
         return dimensions;
@@ -744,77 +723,88 @@ namespace raisim
         return 16;
     }
 
-    void ENVIRONMENT::update_curriculum_coefficient(void){
+    void ENVIRONMENT::update_curriculum_coefficient(void)
+    {
         this->epoch_ += 1;
         this->curriculum_coeff_ = pow(this->curriculum_base_, pow(this->curriculum_decay_, this->epoch_));
     }
 
-    void ENVIRONMENT::set_curriculum_coefficient(double value){
-        if (value>1){value = 1;};
-        if (value<0){value = 0;};
+    void ENVIRONMENT::set_curriculum_coefficient(double value)
+    {
+        if (value > 1)
+        {
+            value = 1;
+        };
+        if (value < 0)
+        {
+            value = 0;
+        };
         this->curriculum_coeff_ = value;
     }
 
     // TEST METHODS
 
     void ENVIRONMENT::set_foot_positions_and_base_pose(const Eigen::Ref<EigenVec> &foot_pos,
-        double x,
-        double y,
-        double z,
-        double roll,
-        double pitch,
-        double yaw
-        )
+                                                       double x,
+                                                       double y,
+                                                       double z,
+                                                       double roll,
+                                                       double pitch,
+                                                       double yaw)
     {
         Eigen::VectorXd foot_pos_vec = foot_pos.cast<double>();
 
         Eigen::VectorXd target_joint_angles = Eigen::VectorXd::Zero(12);
         for (int i = 0; i < 4; i++)
         {
-        double x = foot_pos_vec(i * 3);
-        double y = foot_pos_vec(i * 3 + 1) ;
-        double z = foot_pos_vec(i * 3 + 2);
+            double x = foot_pos_vec(i * 3);
+            double y = foot_pos_vec(i * 3 + 1);
+            double z = foot_pos_vec(i * 3 + 2);
 
+            Eigen::Vector3d r;
+            if (this->env_config_.USE_HORIZONTAL_FRAME)
+            {
+                x += 0;
+                y += this->env_config_.H_OFF * pow(-1, i);
+                z += -this->env_config_.LEG_SPAN * (1 - 0.225);
+            }
 
-        Eigen::Vector3d r;
-        if (this->env_config_.USE_HORIZONTAL_FRAME){
-            x += 0;
-            y += this->env_config_.H_OFF * pow(-1, i);
-            z += -this->env_config_.LEG_SPAN * (1 - 0.225); 
-        }
+            double roll = this->base_euler_(0);
+            double pitch = this->base_euler_(1);
 
-        double roll = this->base_euler_(0);
-        double pitch = this->base_euler_(1);
+            r = {
+                x * std::cos(pitch) + y * std::sin(pitch) * std::sin(roll) + z * std::sin(pitch) * std::cos(roll) + 0,
+                0 + y * std::cos(roll) - z * std::sin(roll),
+                -x * std::sin(pitch) + y * std::cos(pitch) * std::sin(roll) + z * std::cos(pitch) * std::cos(roll)};
 
-        r = {
-            x * std::cos(pitch) + y * std::sin(pitch) * std::sin(roll) + z * std::sin(pitch) * std::cos(roll) + 0,
-            0 + y * std::cos(roll) - z * std::sin(roll),
-            -x * std::sin(pitch) + y * std::cos(pitch) * std::sin(roll) + z * std::cos(pitch) * std::cos(roll)};
-        
-        if (!this->env_config_.USE_HORIZONTAL_FRAME){
-            r(1) += this->env_config_.H_OFF * pow(-1, i);
-            r(2) += -this->env_config_.LEG_SPAN * (1 - 0.225); 
-        }
+            if (!this->env_config_.USE_HORIZONTAL_FRAME)
+            {
+                r(1) += this->env_config_.H_OFF * pow(-1, i);
+                r(2) += -this->env_config_.LEG_SPAN * (1 - 0.225);
+            }
 
-        if ( (i == 2 || i == 3) && this->env_config_.ROBOT_LEG_CONFIG == "><"){
-            r(0) = -r(0);
-        }
+            if ((i == 2 || i == 3) && this->env_config_.ROBOT_LEG_CONFIG == "><")
+            {
+                r(0) = -r(0);
+            }
 
-        bool right_leg = i == 1 || i == 3;
-  
-        // Asing the joint angles to the joint angle vector.
-        auto leg_joint_angles = solve_leg_IK(right_leg, r, &this->env_config_);
+            bool right_leg = i == 1 || i == 3;
 
-        if ( (i == 2 || i == 3) && this->env_config_.ROBOT_LEG_CONFIG == "><"){
-            target_joint_angles(i * 3)     = leg_joint_angles[0];
-            target_joint_angles(i * 3 + 1) = -leg_joint_angles[1];
-            target_joint_angles(i * 3 + 2) = -leg_joint_angles[2];
-        }
-        else{  
-            target_joint_angles(i * 3)     = leg_joint_angles[0];
-            target_joint_angles(i * 3 + 1) = leg_joint_angles[1];
-            target_joint_angles(i * 3 + 2) = leg_joint_angles[2];
-        }  
+            // Asing the joint angles to the joint angle vector.
+            auto leg_joint_angles = solve_leg_IK(right_leg, r, &this->env_config_);
+
+            if ((i == 2 || i == 3) && this->env_config_.ROBOT_LEG_CONFIG == "><")
+            {
+                target_joint_angles(i * 3) = leg_joint_angles[0];
+                target_joint_angles(i * 3 + 1) = -leg_joint_angles[1];
+                target_joint_angles(i * 3 + 2) = -leg_joint_angles[2];
+            }
+            else
+            {
+                target_joint_angles(i * 3) = leg_joint_angles[0];
+                target_joint_angles(i * 3 + 1) = leg_joint_angles[1];
+                target_joint_angles(i * 3 + 2) = leg_joint_angles[2];
+            }
         }
 
         int sim_steps = int(this->control_dt_ / simulation_dt_ + 1e-10);
@@ -830,43 +820,38 @@ namespace raisim
             if (this->server_)
                 this->server_->unlockVisualizationServerMutex();
         }
-        
     }
 
-    
-
     void ENVIRONMENT::set_gait_config(
-            double base_frequency,
-            double leg_1_phase,
-            double leg_2_phase,
-            double leg_3_phase,
-            double leg_4_phase,
-            double foot_vertical_span,
-            double angular_movement_delta,
-            double x_movement_delta,
-            double y_movement_delta,
-            double leg_span,
-            bool use_horizontal_frame
-        ){
-            this->env_config_.BASE_FREQUENCY  = !std::isnan(base_frequency) ? base_frequency : this->env_config_.BASE_FREQUENCY;
+        double base_frequency,
+        double leg_1_phase,
+        double leg_2_phase,
+        double leg_3_phase,
+        double leg_4_phase,
+        double foot_vertical_span,
+        double angular_movement_delta,
+        double x_movement_delta,
+        double y_movement_delta,
+        double leg_span,
+        bool use_horizontal_frame)
+    {
+        this->env_config_.BASE_FREQUENCY = !std::isnan(base_frequency) ? base_frequency : this->env_config_.BASE_FREQUENCY;
 
-            this->env_config_.SIGMA_0[0] = !std::isnan(leg_1_phase) ? leg_1_phase : this->env_config_.SIGMA_0[0];
-            this->env_config_.SIGMA_0[1] = !std::isnan(leg_2_phase) ? leg_2_phase : this->env_config_.SIGMA_0[1];
-            this->env_config_.SIGMA_0[2] = !std::isnan(leg_3_phase) ? leg_3_phase : this->env_config_.SIGMA_0[2];
-            this->env_config_.SIGMA_0[3] = !std::isnan(leg_4_phase) ? leg_4_phase : this->env_config_.SIGMA_0[3];
+        this->env_config_.SIGMA_0[0] = !std::isnan(leg_1_phase) ? leg_1_phase : this->env_config_.SIGMA_0[0];
+        this->env_config_.SIGMA_0[1] = !std::isnan(leg_2_phase) ? leg_2_phase : this->env_config_.SIGMA_0[1];
+        this->env_config_.SIGMA_0[2] = !std::isnan(leg_3_phase) ? leg_3_phase : this->env_config_.SIGMA_0[2];
+        this->env_config_.SIGMA_0[3] = !std::isnan(leg_4_phase) ? leg_4_phase : this->env_config_.SIGMA_0[3];
 
-            this->env_config_.H = !std::isnan(foot_vertical_span) ? foot_vertical_span : this->env_config_.H;
-            
-            this->env_config_.X_MOV_DELTA = !std::isnan(x_movement_delta) ? x_movement_delta : this->env_config_.X_MOV_DELTA;
-            this->env_config_.Y_MOV_DELTA = !std::isnan(y_movement_delta) ? y_movement_delta : this->env_config_.Y_MOV_DELTA;
-            this->env_config_.ANG_MOV_DELTA = !std::isnan(angular_movement_delta) ? angular_movement_delta : this->env_config_.ANG_MOV_DELTA;
+        this->env_config_.H = !std::isnan(foot_vertical_span) ? foot_vertical_span : this->env_config_.H;
 
-            this->env_config_.LEG_SPAN  = !std::isnan(leg_span) ? leg_span : this->env_config_.LEG_SPAN;
+        this->env_config_.X_MOV_DELTA = !std::isnan(x_movement_delta) ? x_movement_delta : this->env_config_.X_MOV_DELTA;
+        this->env_config_.Y_MOV_DELTA = !std::isnan(y_movement_delta) ? y_movement_delta : this->env_config_.Y_MOV_DELTA;
+        this->env_config_.ANG_MOV_DELTA = !std::isnan(angular_movement_delta) ? angular_movement_delta : this->env_config_.ANG_MOV_DELTA;
 
-            this->env_config_.USE_HORIZONTAL_FRAME = !std::isnan(use_horizontal_frame) ? use_horizontal_frame : this->env_config_.USE_HORIZONTAL_FRAME ;
-            
+        this->env_config_.LEG_SPAN = !std::isnan(leg_span) ? leg_span : this->env_config_.LEG_SPAN;
 
-        }
+        this->env_config_.USE_HORIZONTAL_FRAME = !std::isnan(use_horizontal_frame) ? use_horizontal_frame : this->env_config_.USE_HORIZONTAL_FRAME;
+    }
 
     void ENVIRONMENT::set_absolute_position(
         double x,
@@ -874,8 +859,7 @@ namespace raisim
         double z,
         double roll,
         double pitch,
-        double yaw
-        )
+        double yaw)
     {
         this->generalized_coord_init_[0] = !std::isnan(x) ? x : this->generalized_coord_[0];
         this->generalized_coord_init_[1] = !std::isnan(y) ? y : this->generalized_coord_[1];
@@ -885,15 +869,14 @@ namespace raisim
             this->generalized_coord_[3],
             this->generalized_coord_[4],
             this->generalized_coord_[5],
-            this->generalized_coord_[6]
-        };
+            this->generalized_coord_[6]};
 
         EulerAngles euler = to_euler_angles(qt);
 
         double real_roll = !std::isnan(roll) ? glm::radians(roll) : euler.roll;
         double real_pitch = !std::isnan(pitch) ? glm::radians(pitch) : euler.pitch;
         double real_yaw = !std::isnan(yaw) ? glm::radians(yaw) : euler.yaw;
-        
+
         EulerAngles real_euler{real_roll, real_pitch, real_yaw};
         // Create the quaternion
         Quaternion real_q = to_quaternion(real_euler);
@@ -996,12 +979,14 @@ namespace raisim
         {
             this->current_command_mode_ = (command_t)(rand() % 3);
         }
+
         else if (this->command_mode_ == command_t::PROBABILITY && !preserve_command_mode)
         {
             double prob = zero_one_real_dist_(this->merssen_twister_);
 
-            // Case 1: We want the robot to go straight to the target facing it 
-            if (prob < this->case_1_prob_){
+            // Case 1: We want the robot to go straight to the target facing it
+            if (prob < this->case_1_prob_)
+            {
                 this->current_command_mode_ = command_t::STRAIGHT;
                 this->facing_angle_ = 0;
                 this->turning_direction_ = 0;
@@ -1016,27 +1001,28 @@ namespace raisim
             // Case 3: Now we want the robot spin standing in place
             else if (prob < this->case_1_prob_ + this->case_2_prob_ + this->case_3_prob_)
             {
-                this->current_command_mode_ = command_t::STATIC_SPIN; 
+                this->current_command_mode_ = command_t::STATIC_SPIN;
             }
             // Case 4: The robot stays in one place
             else if (prob < this->case_1_prob_ + this->case_2_prob_ + this->case_3_prob_ + this->case_4_prob_)
             {
-                this->current_command_mode_ = command_t::STANCE; 
-            }  
+                this->current_command_mode_ = command_t::STANCE;
+            }
             // Case 5: The robot moves in a fixed direction
             else
             {
-                this->current_command_mode_ = command_t::FIXED_DIRECTION; 
+                this->current_command_mode_ = command_t::FIXED_DIRECTION;
             }
         }
-        else if (preserve_command_mode){
+        else if (preserve_command_mode)
+        {
             this->current_command_mode_ = this->current_command_mode_;
         }
         else
         {
             this->current_command_mode_ = this->command_mode_;
         }
-        
+
         double x_size;
         double y_size;
         switch (this->current_command_mode_)
@@ -1044,7 +1030,7 @@ namespace raisim
         case command_t::STRAIGHT:
             this->env_config_.CARTESIAN_DELTA = true;
             this->env_config_.ANGULAR_DELTA = true;
-            
+
             this->target_angle_ = -M_PI + rand() * (M_PI + M_PI) / RAND_MAX;
             this->target_position_[0] = this->generalized_coord_[0] +
                                         1.5 * std::cos(this->target_angle_);
@@ -1097,12 +1083,11 @@ namespace raisim
             this->target_direction_.setZero(2);
             this->turning_direction_ = this->minus_one_one_dist(this->merssen_twister_);
             break;
-        
-        case command_t::FIXED_DIRECTION:    
+
+        case command_t::FIXED_DIRECTION:
             this->turning_direction_ = 0;
             this->target_angle_ = -M_PI + rand() * (M_PI + M_PI) / RAND_MAX;
             break;
-        
 
         default:
             break;
@@ -1116,8 +1101,8 @@ namespace raisim
         // If directed_gait_ is true, change the turning_direction_ to reduce
         // the target_angle_ to 0.
         if (this->current_command_mode_ == command_t::STRAIGHT)
-        {   
-            
+        {
+
             this->env_config_.CARTESIAN_DELTA = true;
             this->env_config_.ANGULAR_DELTA = true;
 
@@ -1135,13 +1120,23 @@ namespace raisim
 
             if (std::abs(this->target_angle_ - this->facing_angle_) > M_PI / 6)
             {
-                this->turning_direction_ = int ((this->target_angle_ - this->facing_angle_) /
-                                           std::abs(this->target_angle_ - this->facing_angle_));
+                // Calculate the shortest turning direction
+                double angle_difference = this->target_angle_ - this->facing_angle_;
+                if (angle_difference > M_PI)
+                {
+                    angle_difference -= 2 * M_PI;
+                }
+                else if (angle_difference < -M_PI)
+                {
+                    angle_difference += 2 * M_PI;
+                }
+
+                this->turning_direction_ = static_cast<int>(std::copysign(1.0, angle_difference));
             }
             else
             {
                 this->turning_direction_ = 0;
-            };
+            }
         }
 
         this->update_visual_objects();
@@ -1172,21 +1167,30 @@ namespace raisim
             if (this->display_direction_)
             {
                 double scale = 0.3;
-
                 this->direction_body_->clearPoints();
                 this->direction_body_->addPoint(
                     this->generalized_coord_.head(3) + Eigen::Vector3d(0, 0, 0.15));
                 Eigen::Vector2d tar_dir = (this->target_position_ - this->generalized_coord_.head(2))
                                               .normalized();
-                Eigen::Vector3d direction_head_pos(
-                    this->generalized_coord_[0] + tar_dir[0] * scale,
-                    this->generalized_coord_[1] + tar_dir[1] * scale,
-                    this->generalized_coord_[2] + 0.15);
-                this->direction_body_->addPoint(direction_head_pos);
-                this->direction_head_->setPosition(
-                    direction_head_pos[0],
-                    direction_head_pos[1],
-                    direction_head_pos[2]);
+                // Fix for very small values
+                if (tar_dir.norm() > 1e-4)
+                {
+                    Eigen::Vector3d direction_head_pos(
+                        this->generalized_coord_[0] + tar_dir[0] * scale,
+                        this->generalized_coord_[1] + tar_dir[1] * scale,
+                        this->generalized_coord_[2] + 0.15);
+                    this->direction_body_->addPoint(direction_head_pos);
+                    this->direction_head_->setPosition(
+                        direction_head_pos[0],
+                        direction_head_pos[1],
+                        direction_head_pos[2]);
+                }
+                else
+                {
+                    this->direction_head_->setPosition(0, 0, 100);
+                    this->direction_body_->addPoint(Eigen::Vector3d(0, 0, 200));
+                    this->direction_body_->addPoint(Eigen::Vector3d(0, 0, 201));
+                }
             }
             if (this->display_turning_)
             {
@@ -1314,7 +1318,7 @@ namespace raisim
         quat[3] = this->generalized_coord_[6];
 
         raisim::quatToRotMat(quat, rot);
-        this->linear_vel_  = rot.e().transpose() * this->generalized_vel_.segment(0, 3);
+        this->linear_vel_ = rot.e().transpose() * this->generalized_vel_.segment(0, 3);
         this->angular_vel_ = rot.e().transpose() * this->generalized_vel_.segment(3, 3);
 
         Quaternion qt;
@@ -1325,17 +1329,15 @@ namespace raisim
         qt.z = this->generalized_coord_[6];
 
         EulerAngles euler = to_euler_angles(qt);
-        
-        this->base_euler_ << euler.roll + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
-                             euler.pitch + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
-                             euler.yaw + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_;
-        
 
-        this->gravity_vector_ << - std::sin(base_euler_[1] ),
-                std::sin(base_euler_[0]) * std::cos(base_euler_[1]),
-                std::cos(base_euler_[0]) * std::cos(base_euler_[1]);
-        
-        
+        this->base_euler_ << euler.roll + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
+            euler.pitch + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_,
+            euler.yaw + this->norm_dist_(this->random_gen_) * this->orientation_noise_std_;
+
+        this->gravity_vector_ << -std::sin(base_euler_[1]),
+            std::sin(base_euler_[0]) * std::cos(base_euler_[1]),
+            std::cos(base_euler_[0]) * std::cos(base_euler_[1]);
+
         // Calculate the rotation matrix with the negative of the euler angles
         // This is done to get the rotation matrix from the world frame to the body frame
         // This is done because the gravity vector is defined in the body frame
@@ -1351,7 +1353,7 @@ namespace raisim
         this->x_component_vector_ << new_rot.row(0).transpose();
         this->y_component_vector_ << new_rot.row(1).transpose();
         this->z_component_vector_ << new_rot.row(2).transpose();
-        
+
         this->height_scanner_.foot_scan(euler.yaw);
 
         // Getting body height
@@ -1365,14 +1367,13 @@ namespace raisim
             raisim::RAISIM_STATIC_COLLISION_GROUP);
         this->body_height_ = (generalized_coord_.head(3) - height_rt[0].getPosition()).norm();
 
-
         this->contact_solver_.contact_info();
 
         this->joint_position_ = this->generalized_coord_.tail(12);
         this->joint_velocity_ = this->generalized_vel_.tail(12);
 
         this->external_force_applier_.external_force_in_base(rot.e());
-        
+
         this->observations_["target_direction"] << this->target_direction_;
         this->observations_["turning_direction"][0] = this->turning_direction_;
         this->observations_["body_height"][0] = this->body_height_;
@@ -1414,27 +1415,31 @@ namespace raisim
         // Fill the regular observations vector and the privileged observations vector
         int i = 0;
         int obs_size;
-        for (const std::string &key : this->regular_observations_keys_){
+        for (const std::string &key : this->regular_observations_keys_)
+        {
             obs_size = this->observations_[key].size();
-            this->observations_vector_.segment(i,  i + obs_size) << this->observations_[key];
+            this->observations_vector_.segment(i, i + obs_size) << this->observations_[key];
             i += obs_size;
         }
         // assert that the privileged observations are at the end of the observations vector (Debugging)
         assert(i == this->privileged_obs_begin_idx_);
         i = this->privileged_obs_begin_idx_;
-        for (const std::string &key : this->privileged_observations_keys_){
+        for (const std::string &key : this->privileged_observations_keys_)
+        {
             obs_size = this->observations_[key].size();
-            this->observations_vector_.segment(i,  i + obs_size) << this->observations_[key];
+            this->observations_vector_.segment(i, i + obs_size) << this->observations_[key];
             i += obs_size;
         }
     }
 
-    std::map<std::string, std::array<int, 2>> ENVIRONMENT::get_observations_indexes(){
+    std::map<std::string, std::array<int, 2>> ENVIRONMENT::get_observations_indexes()
+    {
         std::map<std::string, std::array<int, 2>> indexes;
         int i = 0;
         int obs_size;
         std::array<int, 2> idx;
-        for (const std::string &key : this->regular_observations_keys_){
+        for (const std::string &key : this->regular_observations_keys_)
+        {
             obs_size = this->observations_sizes_[key];
             idx[0] = i;
             idx[1] = i + obs_size;
@@ -1444,7 +1449,8 @@ namespace raisim
         // assert that the privileged observations are at the end of the observations vector (Debugging)
         assert(i == this->privileged_obs_begin_idx_);
         i = 0;
-        for (const std::string &key : this->privileged_observations_keys_){
+        for (const std::string &key : this->privileged_observations_keys_)
+        {
             obs_size = this->observations_sizes_[key];
             idx[0] = i;
             idx[1] = i + obs_size;
@@ -1455,16 +1461,18 @@ namespace raisim
     }
 
     void ENVIRONMENT::update_info(void)
-    {   
+    {
         this->info_["traversability"] = this->traversability_;
         this->info_["projected_speed"] = this->target_direction_.dot(this->linear_vel_.head(2));
 
         double g = this->world_->getGravity().e().norm();
         double v2 = this->linear_vel_.head(2).squaredNorm();
-        if (this->body_height_ > 0){
+        if (this->body_height_ > 0)
+        {
             this->info_["froude"] = v2 / (g * this->body_height_);
         }
-        else{
+        else
+        {
             this->info_["froude"] = 0;
         }
 
@@ -1491,8 +1499,7 @@ namespace raisim
         // Linear Velocity Reward
         // -------------------------------------------------------------------//
         double linear_vel_reward;
-        if (this->current_command_mode_ == command_t::STANCE ||
-            this->current_command_mode_ == command_t::STATIC_SPIN)
+        if (target_direction_ == Eigen::Vector2d::Zero())
         {
             linear_vel_reward = std::exp(-1.5 * std::pow(this->linear_vel_.norm(), 2));
         }
@@ -1505,7 +1512,7 @@ namespace raisim
         {
             linear_vel_reward = 1.0;
         };
-        this->rewards_.record("linearVel", float (linear_vel_reward));
+        this->rewards_.record("linearVel", float(linear_vel_reward));
 
         // -------------------------------------------------------------------//
         // Angular Velocity Reward:
@@ -1551,6 +1558,8 @@ namespace raisim
         // -------------------------------------------------------------------//
         double body_motion_reward;
         v_z = this->linear_vel_(2);
+        h_angular_vel = this->angular_vel_.head(2);
+        w_2 = h_angular_vel.dot(h_angular_vel);
         body_motion_reward = std::exp(-1.5 * std::pow(v_z, 2)) + std::exp(-1.5 * w_2);
         rewards_.record("bodyMotion", float(body_motion_reward));
 
@@ -1634,12 +1643,14 @@ namespace raisim
         // If the joints move far from the initial position, the agent is
         // penalized. (For the moment this reward is not used)
         // --------------------------------------------------------------------//
-        // double joint_constraint_reward;
-        // Eigen::VectorXd joint_pos_init_ = this->generalized_coord_init_.segment(6, 18);
-        // joint_constraint_reward = (this->joint_position_ - joint_pos_init_).squaredNorm();
+        double joint_constraint_reward;
+        Eigen::VectorXd joint_pos_init_ = this->generalized_coord_init_.tail(12);
+        // Eigen::VectorXd valid_space_lower = joint_pos_init_.array() + 0.35;
+        // Eigen::VectorXd valid_space_upper = joint_pos_init_.array()  joint_limit_upper;
 
-        // this->rewards_.record("jointConstraint", float(this->curriculum_coeff_ * joint_constraint_reward));
+        joint_constraint_reward = -(this->joint_position_ - joint_pos_init_).squaredNorm();
 
+        this->rewards_.record("jointConstraint", float(joint_constraint_reward));
 
         // -------------------------------------------------------------------//
         // Terminal Reward:
