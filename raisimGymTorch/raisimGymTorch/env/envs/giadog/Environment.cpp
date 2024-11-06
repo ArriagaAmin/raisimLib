@@ -1561,7 +1561,7 @@ namespace raisim
         h_angular_vel = this->angular_vel_.head(2);
         w_2 = h_angular_vel.dot(h_angular_vel);
         body_motion_reward = std::exp(-1.5 * std::pow(v_z, 2)) + std::exp(-1.5 * w_2);
-        rewards_.record("bodyMotion", float(body_motion_reward));
+        this->rewards_.record("bodyMotion", float(body_motion_reward));
 
         // -------------------------------------------------------------------//
         // Linear Orthogonal Velocity Reward:
@@ -1573,7 +1573,7 @@ namespace raisim
         ort_vel = (h_linear_vel - this->target_direction_ * proj_linear_vel).norm();
 
         linear_orthogonal_vel_reward = std::exp(-3 * std::pow(ort_vel, 2));
-        rewards_.record("linearOrthogonalVelocity", float(linear_orthogonal_vel_reward));
+        this->rewards_.record("linearOrthogonalVelocity", float(linear_orthogonal_vel_reward));
 
         // -------------------------------------------------------------------//
         // Body collision reward:
@@ -1643,12 +1643,18 @@ namespace raisim
         // If the joints move far from the initial position, the agent is
         // penalized. (For the moment this reward is not used)
         // --------------------------------------------------------------------//
-        double joint_constraint_reward;
+        double joint_constraint_reward = 0.0;
         Eigen::VectorXd joint_pos_init_ = this->generalized_coord_init_.tail(12);
         // Eigen::VectorXd valid_space_lower = joint_pos_init_.array() + 0.35;
-        // Eigen::VectorXd valid_space_upper = joint_pos_init_.array()  joint_limit_upper;
+        // Eigen::VectorXd valid_space_upper = joint_pos_init_.array() - joint_limit_upper;
 
-        joint_constraint_reward = -(this->joint_position_ - joint_pos_init_).squaredNorm();
+        for (int i = 0; i < 12; ++i)
+        {
+            if (i == 0 || i == 3 || i == 6 || i == 9)
+            {
+                joint_constraint_reward -= (this->joint_position_[i] - joint_pos_init_[i]) * (this->joint_position_[i] - joint_pos_init_[i]);
+            }
+        }
 
         this->rewards_.record("jointConstraint", float(joint_constraint_reward));
 
